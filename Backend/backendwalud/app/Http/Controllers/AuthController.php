@@ -9,33 +9,45 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    // REGISTRO
+    // Registro
     public function register(Request $request)
     {
         $request->validate([
-            'name' => 'required',
+            'document' => 'required|string|unique:users',
+            'name' => 'required|string',
+            'last_name' => 'required|string',
             'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
-            'tipo_usuario' => 'required'
+            'password' => 'required|min:6|confirmed',
+            'birth_date' => 'required|date',
+            'tipo_usuario' => 'required|in:paciente,medico'
         ]);
 
         $user = User::create([
+            'document' => $request->document,
             'name' => $request->name,
+            'last_name' => $request->last_name,
             'email' => $request->email,
+            'birth_date' => $request->birth_date,
             'password' => Hash::make($request->password),
             'tipo_usuario' => $request->tipo_usuario
         ]);
+
         $user->assignRole($request->tipo_usuario);
+
+        $token = $user->createToken('token')->plainTextToken;
+
         return response()->json([
-            'message' => 'Usuario registrado',
-            'user' => $user
+            'message' => 'Usuario registrado exitosamente',
+            'user' => $user,
+            'token' => $token
         ], 201);
     }
 
-    // LOGIN
+    // Login
+    // En AuthController.php - login():
     public function login(Request $request)
     {
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        if(!Auth::attempt($request->only('email','password'))){
             return response()->json([
                 'message' => 'Credenciales incorrectas'
             ], 401);
@@ -43,7 +55,8 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
-        $token = $user->createToken('token')->plainTextToken;
+        // ✅ Crear token con duración extendida
+        $token = $user->createToken('token', ['*'], now()->addDays(7))->plainTextToken;
 
         return response()->json([
             'message' => 'Login exitoso',
@@ -52,7 +65,7 @@ class AuthController extends Controller
         ]);
     }
 
-    // LOGOUT
+    // Logout
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();

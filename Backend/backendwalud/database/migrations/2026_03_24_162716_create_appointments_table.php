@@ -9,21 +9,23 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
-{
-    Schema::create('appointments', function (Blueprint $table) {
-        $table->id();
-
-        $table->foreignId('patient_id')->constrained('users')->onDelete('cascade');
-        $table->foreignId('doctor_id')->constrained('users')->onDelete('cascade');
-
-        $table->date('date');
-        $table->time('time');
-        $table->string('status')->default('pendiente');
-
-        $table->timestamps();
-    });
-}
+    // Actualización de tabla (Faltaban campos)
+    public function up()
+    {
+        Schema::create('appointments', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('patient_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('doctor_id')->constrained('users')->onDelete('cascade');
+            $table->string('patient_document');
+            $table->string('patient_name');
+            $table->string('appointment_type');
+            $table->date('date');
+            $table->time('time');
+            $table->enum('status', ['pendiente', 'realizada', 'cancelada'])->default('pendiente');
+            $table->text('notes')->nullable();
+            $table->timestamps();
+        });
+    }
 
     /**
      * Reverse the migrations.
