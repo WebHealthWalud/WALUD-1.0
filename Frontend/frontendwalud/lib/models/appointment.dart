@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 enum AppointmentStatus { pendiente, cancelada, realizada }
 
 class Appointment {
@@ -30,35 +31,28 @@ class Appointment {
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
-    DateTime parseDateTime() {
-      if (json['date_time'] != null) {
-        return DateTime.parse(json['date_time']);
-      } else if (json['date'] != null && json['time'] != null) {
-        return DateTime.parse('${json['date']}T${json['time']}');
-      }
-      return DateTime.now();
-    }
+  return Appointment(
+    id: json['id'],
+    patientId: json['patient_id'],
+    doctorId: json['doctor_id'],
+    patientName: json['patient_name'] ?? '',
+    doctorName: json['doctor_name'] ?? '',
+    
+    
+    dateTime: DateTime.parse(
+  "${json['date'].toString().split('T')[0]} ${json['time']}"
+    ),
 
-    return Appointment(
-      id: json['id'],
-      patientId: json['patient_id'] ?? 1,
-      doctorId: json['doctor_id'] ?? 2,
-      patientDocument: json['patient_document'] ?? '',
-      patientName: json['patient_name'] ?? 'Paciente',
-      doctorName: json['doctor_name'] ?? 'Médico',
-      appointmentType: json['appointment_type'] ?? 'Consulta',
-      dateTime: parseDateTime(),
-        reason: json['reason'] ?? '',
-      status: AppointmentStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => AppointmentStatus.pendiente,
-      ),
-      notes: json['notes'],
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : null,
-    );
-  }
+    reason: json['reason'] ?? '',
+    appointmentType: json['appointment_type'] ?? '',
+    patientDocument: json['patient_document'] ?? '',
+    status: AppointmentStatus.values.firstWhere(
+      (e) => e.name == json['status'],
+      orElse: () => AppointmentStatus.pendiente,
+    ),
+    notes: json['notes'],
+  );
+}
 
   Map<String, dynamic> toJson() {
     return {
@@ -69,11 +63,11 @@ class Appointment {
       'patient_name': patientName,
       'doctor_name': doctorName,
       'appointment_type': appointmentType,
-      'date': dateTime.toIso8601String().split('T')[0],
-      'time': dateTime.toIso8601String().split('T')[1].substring(0, 5),
+      'date': DateFormat('yyyy-MM-dd').format(dateTime),
+      'time': DateFormat('HH:mm:ss').format(dateTime),
       'status': status.name,
       'notes': notes,
-      'reason': reason, // 👈 ESTE ES EL IMPORTANTE
+      'reason': reason, 
       'created_at': createdAt?.toIso8601String(),
     };
   }
