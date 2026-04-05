@@ -33,7 +33,7 @@ walud/
 ### 🔽 Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/walud.git
+git clone https://github.com/WebHealthWalud/WALUD-1.0
 cd walud
 ```
 
@@ -41,7 +41,7 @@ cd walud
 
 ## 🖥️ Configuración Backend (Laravel)
 
-```bash
+```bash resumen
 cd backend
 composer install
 cp .env.example .env
@@ -50,6 +50,33 @@ php artisan migrate
 php artisan serve
 ```
 
+### 1. Debes ejecutar:
+
+```
+composer install
+```
+
+### 2. Crea el archivo .env:
+
+```
+cp .env.example .env
+```
+
+```
+copy .env.example .env
+```
+
+### 3. Genera la clave para Laravel:
+
+```
+php artisan key:generate
+```
+
+### 4. Levanta el servidor:
+
+```
+php artisan serve
+```
 ---
 
 ## 📱 Configuración Frontend (Flutter)
