@@ -163,7 +163,7 @@ walud/
 
 # 🔗 Enlace del Repositorio
 
-👉 [https://github.com/tu-usuario/walud](https://github.com/WebHealthWalud/WALUD-1.0/edit/main/README.md)
+👉 [https://github.com/WebHealthWalud/WALUD-1.0](https://github.com/WebHealthWalud/WALUD-1.0)
 
 ---
 ##### © **2026** Creado por *EQUIPO WALUD* — Todos los derechos reservados.
