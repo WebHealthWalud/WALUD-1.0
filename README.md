@@ -1,64 +1,157 @@
-
-### ⚙️ Configuración inicial  
-
-- Frontend: Flutter configurado con dependencias básicas  
-- Backend: Laravel instalado con Composer  
-- Base de datos: Configurada en archivo `.env`  
-- Servidor local: Proyecto ejecutándose con `php artisan serve`  
+<img width="1024" height="1024" alt="undefined" src="https://github.com/user-attachments/assets/f701908d-955b-4218-bf56-7431430279de" />
 
 ---
 
-## 🌐 Estructura del repositorio  
+<div align="center">
 
-### 📌 Nombre del repositorio  
-Walud  
+<h1> 🏥 WALUD – Plataforma Digital de Servicios de Salud </h1>
 
-### 🔗 Enlace  
-https://github.com/WebHealthWalud/Walud  
+> 👩🏻‍💻👨🏻‍💻 **Equipo Walud**
+Walud es una plataforma digital que permite a pacientes y médicos gestionar consultas médicas en línea, incluyendo agendamiento de citas, historial médico y pagos digitales.
 
----
-
-### 🌿 Ramas principales  
-
-- `Frontend`  
-- `Backend`
-- `Database`
+</div>
 
 ---
 
-### 📂 Organización de carpetas  
+# 🚀 Creación del Proyecto Base
+
+## 📁 Estructura Inicial
 
 ```
-backend/
-│
-├── app/
-├── routes/
-├── database/
-├── config/
-
-frontend/
-│
-├── lib/
-├── screens/
-├── widgets/
+walud/
+├── frontend/      # Aplicación Flutter
+├── backend/       # API Laravel
+├── README.md
+├── .gitignore
+└── .env.example
 ```
 
 ---
 
-### 👨‍💻 Responsables del equipo  
+## ⚙️ Configuración del Proyecto
 
-- Sarah Katalina González  -> Frontend + Database
-- Yeisson David Romero -> Backend + Database
+### 🔽 Clonar el repositorio
+
+```bash
+git clone https://github.com/tu-usuario/walud.git
+cd walud
+```
+
+---
+
+## 🖥️ Configuración Backend (Laravel)
+
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve
+```
 
 ---
 
-## 🚀 Estado del proyecto  
+## 📱 Configuración Frontend (Flutter)
 
-🟡 En desarrollo (fase inicial – configuración completada)
+```bash
+cd frontend
+flutter pub get
+flutter run
+```
 
 ---
-##### © **2026** Creado por *Walud* — Todos los derechos reservados.
-=======
+
+## 🔑 Archivo de Entorno
+
+Ejemplo `.env.example`:
+
+```
+APP_NAME=Walud
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=walud
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+---
+
+## 📦 Dependencias Principales
+
+### Backend (Laravel)
+
+* Laravel
+* Laravel Sanctum
+* Spatie Laravel Permission
+* MySQL
+
+### Frontend (Flutter)
+
+* Flutter SDK
+* HTTP package
+* Provider / Gestión de estado
+
+---
+
+# 🌿 Estructura del Repositorio
+
+## 📛 Nombre del repositorio
+
+**Walud - 1.0**
+
+---
+
+## 🌱 Ramas principales
+
+* `main` → versión estable
+* `develop` → desarrollo general
+* `feature/*` → nuevas funcionalidades
+* `fix/*` → corrección de errores
+* `backend/*` → desarrollo por rol
+* `frontend/*` → desarrollo por rol
+
+---
+
+## 🧾 Convención de nombres
+
+* Ramas:
+  `feature/nombre-funcionalidad`
+  `fix/nombre-error`
+
+* Commits:
+
+  * `feat:` nueva funcionalidad
+  * `fix:` corrección
+  * `docs:` documentación
+  * `refactor:` mejoras internas
+
+---
+
+## 📂 Organización de carpetas
+
+```
+walud/
+├── backend/
+│   ├── app/
+│   ├── routes/
+│   ├── database/
+│   └── config/
+│
+├── frontend/
+│   ├── lib/
+│   ├── screens/
+│   ├── widgets/
+│   └── services/
+```
+
+---
+
 ## 👥 Equipo de Desarrollo
 
 * **Yeisson Romero** → Backend + Base de Datos
@@ -72,6 +165,4 @@ frontend/
 
 ---
 ##### © **2026** Creado por *EQUIPO WALUD* — Todos los derechos reservados.
->>>>>>> a3ac287f64dd0de29a21b14400871d5f997f7c90
 ---
-
