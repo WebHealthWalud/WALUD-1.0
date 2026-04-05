@@ -1,24 +1,3 @@
-# Walud  
-Es una plataforma digital de salud que permite agendar citas médicas, consultar historiales clínicos y realizar pagos en línea. Facilita el acceso a atención médica remota, optimiza la gestión entre pacientes y médicos, y brinda una experiencia segura, rápida y accesible.
-
----
-
-## 📦 Creación del proyecto base  
-
-El proyecto Walud se estructuró separando frontend y backend para facilitar el desarrollo, mantenimiento y escalabilidad.
-
-### 📁 Estructura inicial
-
-```
-Walud/
-│
-├── frontend/ # Aplicación móvil (Flutter)
-├── backend/ # API REST (Laravel)
-├── README.md # Documentación del proyecto
-├── .env.example # Variables de entorno de ejemplo
-```
-
----
 
 ### ⚙️ Configuración inicial  
 
@@ -79,5 +58,20 @@ frontend/
 
 ---
 ##### © **2026** Creado por *Walud* — Todos los derechos reservados.
+=======
+## 👥 Equipo de Desarrollo
+
+* **Yeisson Romero** → Backend + Base de Datos
+* **Sarah González** → Frontend + Base de Datos + Documentación
+
+---
+
+# 🔗 Enlace del Repositorio
+
+👉 [https://github.com/WebHealthWalud/WALUD-1.0](https://github.com/WebHealthWalud/WALUD-1.0)
+
+---
+##### © **2026** Creado por *EQUIPO WALUD* — Todos los derechos reservados.
+>>>>>>> a3ac287f64dd0de29a21b14400871d5f997f7c90
 ---
 
