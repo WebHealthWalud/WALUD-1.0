@@ -79,6 +79,42 @@ class UserController extends Controller
         return response()->json($user);
     }
 
+    // Buscar paciente por documento y tipo de documento (Para el médico)
+    public function searchByDocument(Request $request)
+    {
+        try {
+            $request->validate([
+                'document' => 'required|string',
+                'tipo_documento' => 'required|in:cedula_ciudadania,tarjeta_identidad,registro_civil,cedula_extranjeria,carne_diplomatico,pasaporte,permiso_especial_permanencia,permiso_proteccion_temporal'
+            ]);
+
+            $patient = User::where('document', $request->document)
+                ->where('tipo_documento', $request->tipo_documento)
+                ->where('tipo_usuario', 'paciente')
+                ->select('id', 'name', 'last_name', 'email', 'document', 'tipo_documento', 'birth_date', 'tipo_usuario')
+                ->first();
+
+            if (!$patient) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Paciente no encontrado con ese documento y tipo de documento'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'patient' => $patient
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al buscar paciente',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     // ELIMINAR
     public function destroy($id)
     {

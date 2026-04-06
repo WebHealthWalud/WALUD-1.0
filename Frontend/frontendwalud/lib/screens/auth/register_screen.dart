@@ -1,10 +1,10 @@
 // lib/screens/auth/register_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import '../../services/auth_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../../models/user.dart';  
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -25,6 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _birthDateController = TextEditingController();
 
   String _userType = 'paciente';
+  DocumentType _documentType = DocumentType.cedulaCiudadania;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -45,10 +46,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
-    // 1. Validar formulario
     if (!_formKey.currentState!.validate()) return;
 
-    // 2. Validar que las contraseñas coincidan
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -59,12 +58,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // 3. Mostrar loading
     setState(() => _isLoading = true);
 
-    // 4. Llamar al servicio de registro
     final result = await AuthService.register(
       document: _documentController.text.trim(),
+      documentType: _documentType, 
       name: _nameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
@@ -76,10 +74,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = false);
 
-    // 5. Manejar respuesta
     if (mounted) {
       if (result['success']) {
-        // ✅ MOSTRAR MENSAJE DE ÉXITO
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Registro exitoso. Por favor inicia sesión.'),
@@ -88,7 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
 
-        // ✅ REDIRECCIONAR A LOGIN (no a Dashboard)
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             Navigator.pushReplacement(
@@ -98,11 +93,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           }
         });
       } else {
-        // Manejar errores de validación del backend
         String errorMessage = result['message'];
         if (result['errors'] != null) {
           final errors = result['errors'] as Map<String, dynamic>;
-          // Obtener el primer mensaje de error
           errorMessage = errors.values.first?.first ?? errorMessage;
         }
 
@@ -152,11 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Header
                     Row(
                       children: const [
-                        Icon(
-                          Icons.add_circle,
-                          color: Color(0xFF4F46E5),
-                          size: 32,
-                        ),
+                        Icon(Icons.add_circle, color: Color(0xFF4F46E5), size: 32),
                         SizedBox(width: 8),
                         Text(
                           'Registrar Cuenta',
@@ -170,15 +159,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Documento
+                    // Tipo de documento 
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tipo de Documento',
+                          style: TextStyle(
+                            color: Color(0xFF1A1A7A),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<DocumentType>(
+                          value: _documentType,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(25)),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: DocumentType.values.map((type) {
+                            return DropdownMenuItem<DocumentType>(
+                              value: type,
+                              child: Text(type.label),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _documentType = value);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Documento 
                     CustomTextField(
-                      label: 'Documento',
-                      hint: 'Número de identificación',
+                      label: 'Número de Documento',
+                      hint: 'Solo números',
                       controller: _documentController,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Ingrese su documento';
+                        }
+                        // Validar que solo contenga números
+                        if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                          return 'Solo se permiten números';
                         }
                         return null;
                       },
@@ -253,10 +284,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ? 'Seleccionar fecha'
                                   : _birthDateController.text,
                               controller: _birthDateController,
-                              suffixIcon: const Icon(
-                                Icons.calendar_today,
-                                color: Colors.grey,
-                              ),
+                              suffixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
                             ),
                           ),
                         ),
@@ -272,14 +300,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isPassword: _obscurePassword,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
                           color: Colors.grey,
                         ),
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
                       validator: (value) {
                         if (value == null || value.length < 6) {
@@ -298,15 +322,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isPassword: _obscureConfirmPassword,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureConfirmPassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                           color: Colors.grey,
                         ),
-                        onPressed: () => setState(
-                          () => _obscureConfirmPassword =
-                              !_obscureConfirmPassword,
-                        ),
+                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                       ),
                       validator: (value) {
                         if (value != _passwordController.text) {
@@ -381,9 +400,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onPressed: () {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => const LoginScreen(),
-                          ),
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
                         );
                       },
                       child: const Text(

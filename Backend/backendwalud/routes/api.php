@@ -13,4 +13,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::apiResource('users', UserController::class);
     Route::apiResource('appointments', AppointmentController::class);
+    // Busca al paciente por el documento y el tipo de documento (siendo médico)
+    Route::post('/users/search-by-document', [UserController::class, 'searchByDocument']);
 });

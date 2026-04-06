@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+
 enum AppointmentStatus { pendiente, cancelada, realizada }
 
 class Appointment {
@@ -31,28 +32,48 @@ class Appointment {
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
-  return Appointment(
-    id: json['id'],
-    patientId: json['patient_id'],
-    doctorId: json['doctor_id'],
-    patientName: json['patient_name'] ?? '',
-    doctorName: json['doctor_name'] ?? '',
+    DateTime parseDateTime() {
+      try {
     
-    
-    dateTime: DateTime.parse(
-  "${json['date'].toString().split('T')[0]} ${json['time']}"
-    ),
+        if (json['date_time'] != null) {
+          return DateTime.parse(json['date_time']);
+        }
+        
+        if (json['date'] != null && json['time'] != null) {
+        final dateStr = json['date'].toString().split('T')[0]; // '2026-04-05'
+        final timeStr = json['time'].toString(); // '21:47' o '21:47:00'
+        
+        return DateTime.parse('$dateStr $timeStr');
+      }
+      
+      return DateTime.now();
+    } catch (e) {
+      print('❌ Error parseando fecha: $e');
+      print('📅 Date: ${json['date']}, Time: ${json['time']}');
+      return DateTime.now();
+      }
+    }
 
-    reason: json['reason'] ?? '',
-    appointmentType: json['appointment_type'] ?? '',
-    patientDocument: json['patient_document'] ?? '',
-    status: AppointmentStatus.values.firstWhere(
-      (e) => e.name == json['status'],
-      orElse: () => AppointmentStatus.pendiente,
-    ),
-    notes: json['notes'],
-  );
-}
+    return Appointment(
+      id: json['id'],
+      patientId: json['patient_id'] ?? 1,
+      doctorId: json['doctor_id'] ?? 2,
+      patientName: json['patient_name'] ?? '',
+      doctorName: json['doctor_name'] ?? '',
+      dateTime: parseDateTime(),
+      reason: json['reason'] ?? '',
+      appointmentType: json['appointment_type'] ?? '',
+      patientDocument: json['patient_document'] ?? '',
+      status: AppointmentStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => AppointmentStatus.pendiente,
+      ),
+      notes: json['notes'],
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -64,10 +85,10 @@ class Appointment {
       'doctor_name': doctorName,
       'appointment_type': appointmentType,
       'date': DateFormat('yyyy-MM-dd').format(dateTime),
-      'time': DateFormat('HH:mm:ss').format(dateTime),
+      'time': DateFormat('HH:mm').format(dateTime),
       'status': status.name,
       'notes': notes,
-      'reason': reason, 
+      'reason': reason,
       'created_at': createdAt?.toIso8601String(),
     };
   }

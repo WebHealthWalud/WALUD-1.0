@@ -13,7 +13,8 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'document' => 'required|string|unique:users',
+            'document' => 'required|numeric|unique:users',
+            'tipo_documento' => 'required|in:cedula_ciudadania,tarjeta_identidad,registro_civil,cedula_extranjeria,carne_diplomatico,pasaporte,permiso_especial_permanencia,permiso_proteccion_temporal',
             'name' => 'required|string',
             'last_name' => 'required|string',
             'email' => 'required|email|unique:users',
@@ -23,7 +24,8 @@ class AuthController extends Controller
         ]);
 
         $user = User::create([
-            'document' => $request->document,
+            'document' => (int) $request->document,  
+            'tipo_documento' => $request->tipo_documento,
             'name' => $request->name,
             'last_name' => $request->last_name,
             'email' => $request->email,
@@ -33,8 +35,7 @@ class AuthController extends Controller
         ]);
 
         $user->assignRole($request->tipo_usuario);
-
-        $token = $user->createToken('token')->plainTextToken;
+        $token = $user->createToken('token', ['*'], now()->addDays(7))->plainTextToken;
 
         return response()->json([
             'message' => 'Usuario registrado exitosamente',

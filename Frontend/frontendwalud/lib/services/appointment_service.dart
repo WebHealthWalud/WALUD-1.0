@@ -6,25 +6,34 @@ import '../config/api_config.dart';
 import 'package:intl/intl.dart';
 
 class AppointmentService {
+
   static Future<Map<String, dynamic>> create(Appointment appointment) async {
     try {
-      final response =
-          await ApiService.postAuth(ApiConfig.appointmentsEndpoint, {
-            'patient_id': appointment.patientId,
-            'doctor_id': appointment.doctorId,
-            'patient_document': appointment.patientDocument,
-            'patient_name': appointment.patientName,
-            'appointment_type': appointment.appointmentType,
-            'date': DateFormat('yyyy-MM-dd').format(appointment.dateTime),
-            'time': DateFormat('HH:mm').format(appointment.dateTime),
-            'status': appointment.status.name,
-            'notes': appointment.notes,
-            'reason': appointment.reason,
-          });
+      final dateStr = DateFormat('yyyy-MM-dd').format(appointment.dateTime);
+      final timeStr = DateFormat('HH:mm').format(appointment.dateTime);
 
-      // 🔥 DEBUG (CLAVE PARA 422)
-      print('STATUS: ${response.statusCode}');
-      print('BODY: ${response.body}');
+      print('📅 ENVIANDO - Fecha: $dateStr, Hora: $timeStr');
+      print('👤 patient_document: ${appointment.patientDocument}');
+      print('👤 patient_name: ${appointment.patientName}');
+
+      final response = await ApiService.postAuth(
+        ApiConfig.appointmentsEndpoint,
+        {
+          'patient_id': appointment.patientId,
+          'doctor_id': appointment.doctorId,
+          'patient_document': appointment.patientDocument,
+          'patient_name': appointment.patientName,
+          'appointment_type': appointment.appointmentType,
+          'date': dateStr,  
+          'time': timeStr, 
+          'status': appointment.status.name,
+          'notes': appointment.notes,
+          'reason': appointment.reason,
+        },
+      );
+
+      print('📡 STATUS: ${response.statusCode}');
+      print('📡 BODY: ${response.body}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
@@ -40,39 +49,25 @@ class AppointmentService {
         return {
           'success': false,
           'message': error['message'] ?? 'Error al crear cita',
-          'errors': error['errors'], // 👈 IMPORTANTE
+          'errors': error['errors'],
         };
       }
     } catch (e) {
+      print('❌ ERROR: $e');
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
 
-  static Future<Map<String, dynamic>> getAll({
-    int? patientId,
-    int? doctorId,
-  }) async {
+  static Future<Map<String, dynamic>> getAll() async {
     try {
-      String url = ApiConfig.appointmentsEndpoint;
-      if (patientId != null) {
-        url += '?patient_id=$patientId';
-      } else if (doctorId != null) {
-        url += '?doctor_id=$doctorId';
-      }
-
-      final response = await ApiService.getAuth(url);
+      final response = await ApiService.getAuth(ApiConfig.appointmentsEndpoint);
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List appointmentsJson = data is List
-            ? data
-            : (data['data'] ?? data['appointments'] ?? []);
+        final List<dynamic> data = jsonDecode(response.body);
 
         return {
           'success': true,
-          'appointments': appointmentsJson
-              .map((a) => Appointment.fromJson(a))
-              .toList(),
+          'appointments': data.map((a) => Appointment.fromJson(a)).toList(),
         };
       } else {
         return {'success': false, 'message': 'Error al obtener citas'};
@@ -87,13 +82,15 @@ class AppointmentService {
     Appointment appointment,
   ) async {
     try {
-      final response = await ApiService.putAuth(
-        '${ApiConfig.appointmentsEndpoint}/$id',
-        appointment.toJson(), // ✅ consistente con create
-      );
-
-      print('UPDATE STATUS: ${response.statusCode}');
-      print('UPDATE BODY: ${response.body}');
+      final response =
+          await ApiService.putAuth('${ApiConfig.appointmentsEndpoint}/$id', {
+            'doctor_id': appointment.doctorId,
+            'date': DateFormat('yyyy-MM-dd').format(appointment.dateTime),
+            'time': DateFormat('HH:mm').format(appointment.dateTime),
+            'reason': appointment.reason,
+            'status': appointment.status.name,
+            'notes': appointment.notes,
+          });
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

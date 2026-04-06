@@ -26,8 +26,14 @@ class User extends Authenticatable
         'password',
         'tipo_usuario',
         'document',
+        'tipo_documento',
         'last_name',
         'birth_date',
+    ];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
     ];
 
     /**
@@ -36,6 +42,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
+        'document' => 'integer', // Forzar casteo a entero
         'password',
         'remember_token',
     ];

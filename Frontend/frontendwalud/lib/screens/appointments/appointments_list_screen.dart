@@ -28,20 +28,13 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
 
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
-
-    final result = await AppointmentService.getAll(
-      patientId: widget.patientId,
-      doctorId: widget.doctorId,
-    );
+    final result = await AppointmentService.getAll();
 
     if (mounted) {
       setState(() {
         _isLoading = false;
         if (result['success']) {
           _appointments = List<Appointment>.from(result['appointments']);
-
-          // DEBUG
-          print('CITAS CARGADAS: ${_appointments.length}');
         }
       });
 
@@ -151,55 +144,53 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredAppointments.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event_busy,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No hay citas',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_busy,
+                          size: 80,
+                          color: Colors.grey[400],
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadAppointments,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 80),
-                          itemCount: _filteredAppointments.length,
-                          itemBuilder: (context, index) {
-                            final appointment = _filteredAppointments[index];
-                            return AppointmentCard(
-                              appointment: appointment,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => EditAppointmentScreen(
-                                      appointment: appointment,
-                                      onUpdated: _loadAppointments,
-                                    ),
-                                  ),
-                                );
-                              },
-                              onDelete: () =>
-                                  _deleteAppointment(appointment.id!),
-                              onStatusChange: (status) =>
-                                  _updateStatus(
-                                      appointment.id!, status),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No hay citas',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadAppointments,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      itemCount: _filteredAppointments.length,
+                      itemBuilder: (context, index) {
+                        final appointment = _filteredAppointments[index];
+                        return AppointmentCard(
+                          appointment: appointment,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditAppointmentScreen(
+                                  appointment: appointment,
+                                  onUpdated: _loadAppointments,
+                                ),
+                              ),
                             );
                           },
-                        ),
-                      ),
+                          onDelete: () => _deleteAppointment(appointment.id!),
+                          onStatusChange: (status) =>
+                              _updateStatus(appointment.id!, status),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -234,8 +225,7 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
         checkmarkColor: const Color(0xFF4F46E5),
         labelStyle: TextStyle(
           color: isSelected ? const Color(0xFF4F46E5) : Colors.grey[700],
-          fontWeight:
-              isSelected ? FontWeight.bold : FontWeight.normal,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
     );

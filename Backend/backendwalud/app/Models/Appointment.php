@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
+
 class Appointment extends Model
 {
     protected $fillable = [
@@ -19,8 +21,10 @@ class Appointment extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
-        'time' => 'datetime:H:i',
+        'date' => 'date:Y-m-d',
+        'time' => 'string',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function patient()
@@ -31,5 +35,13 @@ class Appointment extends Model
     public function doctor()
     {
         return $this->belongsTo(User::class, 'doctor_id');
+    }
+
+    public function getDateTimeAttribute()
+    {
+        if ($this->date && $this->time) {
+            return \Carbon\Carbon::parse("{$this->date} {$this->time}");
+        }
+        return null;
     }
 }

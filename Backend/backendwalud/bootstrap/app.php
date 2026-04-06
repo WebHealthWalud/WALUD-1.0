@@ -12,7 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->redirectGuestsTo(fn () => response()->json(['message' => 'No autenticado'], 401));
+        $middleware->redirectUsersTo(fn () => response()->json(['message' => 'No autorizado'], 403));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

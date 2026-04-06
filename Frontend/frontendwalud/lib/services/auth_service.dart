@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import 'api_service.dart';
 import '../config/api_config.dart';
-
 class AuthService {
   static Future<Map<String, dynamic>> login(
     String email,
@@ -45,6 +44,7 @@ class AuthService {
 
   static Future<Map<String, dynamic>> register({
     required String document,
+    required DocumentType documentType,
     required String name,
     required String lastName,
     required String email,
@@ -56,6 +56,7 @@ class AuthService {
     try {
       final response = await ApiService.post(ApiConfig.registerEndpoint, {
         'document': document,
+        'tipo_documento': documentType.value,
         'name': name,
         'last_name': lastName,
         'email': email,
@@ -67,12 +68,6 @@ class AuthService {
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-
-        // NO guardar token en registro (el usuario debe loguearse)
-        // if (data['token'] != null) {
-        //   await ApiService.saveToken(data['token']);
-        // }
-
         return {
           'success': true,
           'message': data['message'] ?? 'Registro exitoso',
