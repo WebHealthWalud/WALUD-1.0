@@ -5,7 +5,7 @@ import 'screens/dashboard/dashboard_screen.dart';
 import 'services/auth_service.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Necesario para async en main
+  WidgetsFlutterBinding.ensureInitialized(); 
   runApp(const WaludApp());
 }
 

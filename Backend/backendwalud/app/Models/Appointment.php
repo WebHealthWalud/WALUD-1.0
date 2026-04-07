@@ -12,12 +12,15 @@ class Appointment extends Model
         'doctor_id',
         'patient_document',
         'patient_name',
+        'especialidad',
         'appointment_type',
         'date',
         'time',
         'status',
         'notes',
         'reason',
+        'attachment_path',
+        'attachment_name',
     ];
 
     protected $casts = [
@@ -43,5 +46,10 @@ class Appointment extends Model
             return \Carbon\Carbon::parse("{$this->date} {$this->time}");
         }
         return null;
+    }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class);
     }
 }

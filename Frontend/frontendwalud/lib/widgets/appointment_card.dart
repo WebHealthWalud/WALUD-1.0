@@ -20,6 +20,9 @@ class AppointmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Getters correctos del modelo actualizado
+    final statusColor = Color(int.parse('0x${appointment.statusColor}'));
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -32,7 +35,7 @@ class AppointmentCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header con estado
+              // ── Header con estado
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -42,9 +45,7 @@ class AppointmentCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Color(
-                        int.parse('0x${appointment.getStatusColor()}'),
-                      ).withOpacity(0.2),
+                      color: statusColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -54,19 +55,16 @@ class AppointmentCard extends StatelessWidget {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: Color(
-                              int.parse('0x${appointment.getStatusColor()}'),
-                            ),
+                            color: statusColor,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          appointment.getStatusText(),
+                          // ✅ statusLabel en vez de getStatusText()
+                          appointment.statusLabel,
                           style: TextStyle(
-                            color: Color(
-                              int.parse('0x${appointment.getStatusColor()}'),
-                            ),
+                            color: statusColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -82,7 +80,8 @@ class AppointmentCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              // Médico
+
+              // ── Médico
               Row(
                 children: [
                   const Icon(Icons.person, color: Color(0xFF4F46E5), size: 20),
@@ -100,14 +99,11 @@ class AppointmentCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              // Fecha y hora
+
+              // ── Fecha y hora
               Row(
                 children: [
-                  const Icon(
-                    Icons.calendar_today,
-                    color: Colors.grey,
-                    size: 18,
-                  ),
+                  const Icon(Icons.calendar_today, color: Colors.grey, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     DateFormat('dd MMM yyyy').format(appointment.dateTime),
@@ -123,8 +119,8 @@ class AppointmentCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              // Motivo
-              // Motivo (placeholder)
+
+              // ── Motivo ✅ muestra el valor real en vez del placeholder
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -132,7 +128,9 @@ class AppointmentCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Sin información adicional',
+                      appointment.reason.isNotEmpty
+                          ? appointment.reason
+                          : 'Sin información adicional',
                       style: const TextStyle(color: Colors.black87),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -140,7 +138,8 @@ class AppointmentCard extends StatelessWidget {
                   ),
                 ],
               ),
-              // Acciones de estado
+
+              // ── Acciones de estado
               if (showActions &&
                   onStatusChange != null &&
                   appointment.status == AppointmentStatus.pendiente) ...[

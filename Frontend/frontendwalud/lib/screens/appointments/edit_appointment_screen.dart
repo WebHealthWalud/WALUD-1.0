@@ -21,68 +21,61 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _reasonController;
   late TextEditingController _notesController;
-
-  late DateTime _selectedDate;
+  late DateTime  _selectedDate;
   late TimeOfDay _selectedTime;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _notesController = TextEditingController(
-      text: widget.appointment.notes ?? '',
-    );
-    _selectedDate = widget.appointment.dateTime;
-    _selectedTime = TimeOfDay.fromDateTime(widget.appointment.dateTime);
+    // ✅ reason nunca es null en el modelo actualizado
+    _reasonController = TextEditingController(text: widget.appointment.reason);
+    _notesController  = TextEditingController(text: widget.appointment.notes ?? '');
+    _selectedDate     = widget.appointment.dateTime;
+    _selectedTime     = TimeOfDay.fromDateTime(widget.appointment.dateTime);
   }
 
   Future<void> _selectDate() async {
     final date = await showDatePicker(
-      context: context,
+      context:     context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-      locale: const Locale('es', 'ES'),
+      firstDate:   DateTime.now(),
+      lastDate:    DateTime.now().add(const Duration(days: 90)),
     );
     if (date != null) setState(() => _selectedDate = date);
   }
 
   Future<void> _selectTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
+    final time = await showTimePicker(context: context, initialTime: _selectedTime);
     if (time != null) setState(() => _selectedTime = time);
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
     final dateTime = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      _selectedTime.hour,
-      _selectedTime.minute,
+      _selectedDate.year, _selectedDate.month, _selectedDate.day,
+      _selectedTime.hour, _selectedTime.minute,
     );
 
     final updatedAppointment = Appointment(
-      id: widget.appointment.id,
-      patientId: widget.appointment.patientId,
-      doctorId: widget.appointment.doctorId,
-      patientName: widget.appointment.patientName,
-      doctorName: widget.appointment.doctorName,
-      dateTime: dateTime,
-      reason: _reasonController.text,
-      status: widget.appointment.status,
+      id:              widget.appointment.id,
+      patientId:       widget.appointment.patientId,
+      doctorId:        widget.appointment.doctorId,
+      patientDocument: widget.appointment.patientDocument,
+      patientName:     widget.appointment.patientName,
+      doctorName:      widget.appointment.doctorName,
+      especialidad:    widget.appointment.especialidad,
       appointmentType: widget.appointment.appointmentType,
-      patientDocument: widget.appointment.patientDocument, // 👈 NUEVO
-      notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+      dateTime:        dateTime,
+      reason:          _reasonController.text,
+      status:          widget.appointment.status,
+      notes:           _notesController.text.isNotEmpty ? _notesController.text : null,
     );
 
-    final result = await AppointmentService.update(
+    // ✅ El servicio tiene métodos static, no se instancia con ()
+    final result = await AppointmentService.updatePatient(
       widget.appointment.id!,
       updatedAppointment,
     );
@@ -92,19 +85,13 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
     if (mounted) {
       if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cita actualizada'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Cita actualizada'), backgroundColor: Colors.green),
         );
         widget.onUpdated?.call();
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
         );
       }
     }
@@ -112,10 +99,15 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ statusColor y statusLabel vienen directo del modelo (enum), no de métodos locales
+    final statusColor = Color(int.parse('0x${widget.appointment.statusColor}'));
+    final statusLabel = widget.appointment.statusLabel;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar Cita'),
+        title: const Text('Editar Cita', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF4F46E5),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -124,37 +116,24 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Estado (solo visualización)
+
+              // ── Estado (solo visualización)
               Card(
-                color: Color(
-                  int.parse('0x${widget.appointment.getStatusColor()}'),
-                ).withOpacity(0.1),
+                color: statusColor.withOpacity(0.1),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Color(
-                            int.parse(
-                              '0x${widget.appointment.getStatusColor()}',
-                            ),
-                          ),
-                          shape: BoxShape.circle,
-                        ),
+                        width: 12, height: 12,
+                        decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        widget.appointment.getStatusText(),
+                        statusLabel,
                         style: TextStyle(
-                          color: Color(
-                            int.parse(
-                              '0x${widget.appointment.getStatusColor()}',
-                            ),
-                          ),
+                          color: statusColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -165,107 +144,78 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Médico (solo visualización)
+              // ── Médico (solo visualización)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Médico',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      const Text('Médico', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.person, color: Color(0xFF4F46E5)),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.appointment.doctorName,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ],
-                      ),
+                      Row(children: [
+                        const Icon(Icons.person, color: Color(0xFF4F46E5)),
+                        const SizedBox(width: 8),
+                        Text(widget.appointment.doctorName, style: const TextStyle(fontSize: 16)),
+                      ]),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Fecha y Hora
+              // ── Fecha y Hora
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Fecha y Hora',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      const Text('Fecha y Hora', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: _selectDate,
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.calendar_today),
-                                  labelText: 'Fecha',
-                                ),
-                                child: Text(
-                                  DateFormat(
-                                    'dd MMM yyyy',
-                                  ).format(_selectedDate),
-                                ),
+                      Row(children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _selectDate,
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.calendar_today),
+                                labelText: 'Fecha',
                               ),
+                              child: Text(DateFormat('dd MMM yyyy').format(_selectedDate)),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: InkWell(
-                              onTap: _selectTime,
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.access_time),
-                                  labelText: 'Hora',
-                                ),
-                                child: Text(_selectedTime.format(context)),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: InkWell(
+                            onTap: _selectTime,
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.access_time),
+                                labelText: 'Hora',
                               ),
+                              child: Text(_selectedTime.format(context)),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ]),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Motivo
+              // ── Motivo
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Motivo de la Consulta',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      const Text('Motivo de la Consulta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _reasonController,
@@ -274,12 +224,7 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
                           prefixIcon: Icon(Icons.note_alt),
                         ),
                         maxLines: 3,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingrese el motivo';
-                          }
-                          return null;
-                        },
+                        validator: (v) => (v == null || v.isEmpty) ? 'Ingrese el motivo' : null,
                       ),
                     ],
                   ),
@@ -287,26 +232,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Notas
+              // ── Notas
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Notas',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      const Text('Notas adicionales', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _notesController,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.edit),
+                          hintText: 'Opcional',
                         ),
                         maxLines: 3,
                       ),
@@ -316,26 +256,21 @@ class _EditAppointmentScreenState extends State<EditAppointmentScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Botón actualizar
+              // ── Botón guardar
               ElevatedButton(
                 onPressed: _isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4F46E5),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Actualizar Cita',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    ? const SizedBox(
+                        height: 20, width: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text('Actualizar Cita', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
