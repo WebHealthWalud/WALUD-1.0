@@ -30,7 +30,7 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Disponibilidad por especialidad y fecha
+     * Slots disponibles por especialidad y fecha
      */
     public function availableSlots(Request $request)
     {
@@ -59,7 +59,7 @@ class AppointmentController extends Controller
                 ->whereDate('date', $request->date)
                 ->whereIn('status', ['pendiente'])
                 ->pluck('time')
-                // Normalizar a HH:MM para comparar correctamente
+                // ✅ Normalizar a HH:MM para comparar correctamente
                 ->map(fn($t) => substr($t, 0, 5))
                 ->toArray();
 
@@ -97,7 +97,7 @@ class AppointmentController extends Controller
                 'doctor_id'        => 'required|exists:users,id',
                 'especialidad'     => 'required|string',
                 'appointment_type' => 'required|string',
-                // Aceptar date como date y time como string HH:MM o HH:MM:SS
+                // ✅ Aceptar date como date y time como string HH:MM o HH:MM:SS
                 'date'             => 'required|date',
                 'time'             => ['required', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
                 'reason'           => 'required|string',
@@ -108,7 +108,7 @@ class AppointmentController extends Controller
                 'patient_tipo_documento' => 'nullable|string',
             ]);
 
-            // Normalizar time a HH:MM siempre
+            // ✅ Normalizar time a HH:MM siempre
             $validated['time'] = substr($validated['time'], 0, 5);
 
             // ── Determinar paciente según tipo de usuario
@@ -143,8 +143,20 @@ class AppointmentController extends Controller
                 $patientDocument = (string) $patient->document;
                 $patientName     = $patient->name . ' ' . $patient->last_name;
 
-                // Médico solo puede asignarse a sí mismo como doctor
-                $validated['doctor_id'] = $user->id;
+                // ✅ El médico puede asignar CUALQUIER doctor (incluyéndose a sí mismo).
+                // Si no se envía doctor_id válido, se asigna a sí mismo por defecto.
+                if (empty($validated['doctor_id'])) {
+                    $validated['doctor_id'] = $user->id;
+                }
+                // Verificar que el doctor_id sea realmente un médico registrado
+                $doctorTarget = User::where('id', $validated['doctor_id'])
+                    ->where('tipo_usuario', 'medico')
+                    ->first();
+                if (!$doctorTarget) {
+                    return response()->json([
+                        'message' => 'El médico seleccionado no es válido',
+                    ], 422);
+                }
             } else {
                 return response()->json(['message' => 'No autorizado'], 403);
             }
@@ -215,7 +227,7 @@ class AppointmentController extends Controller
         $user        = $request->user();
         $appointment = Appointment::findOrFail($id);
 
-        // Solo se pueden editar citas PENDIENTES
+        // ✅ Solo se pueden editar citas PENDIENTES
         if ($appointment->status !== 'pendiente') {
             return response()->json([
                 'message' => 'Solo se pueden modificar citas pendientes',
@@ -231,9 +243,9 @@ class AppointmentController extends Controller
 
         try {
             if ($user->tipo_usuario === 'medico') {
-                // Médico SOLO cambia estado
+                // Médico SOLO puede marcar como 'realizada' — no puede cancelar
                 $validated = $request->validate([
-                    'status' => 'required|in:pendiente,realizada,cancelada',
+                    'status' => 'required|in:realizada',
                 ]);
                 $appointment->update(['status' => $validated['status']]);
 
@@ -244,7 +256,7 @@ class AppointmentController extends Controller
                     'especialidad'     => 'sometimes|string',
                     'appointment_type' => 'sometimes|string',
                     'date'             => 'sometimes|date|after_or_equal:today',
-                    // Aceptar HH:MM o HH:MM:SS
+                    // ✅ Aceptar HH:MM o HH:MM:SS
                     'time'             => ['sometimes', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
                     'reason'           => 'sometimes|string',
                     'notes'            => 'nullable|string',
@@ -253,6 +265,26 @@ class AppointmentController extends Controller
                 // Normalizar time
                 if (isset($validated['time'])) {
                     $validated['time'] = substr($validated['time'], 0, 5);
+                }
+
+                // ✅ Verificar conflicto de slot excluyendo la cita actual
+                if (isset($validated['date']) || isset($validated['time'])) {
+                    $checkDate   = $validated['date']    ?? $appointment->date->format('Y-m-d');
+                    $checkTime   = $validated['time']    ?? substr($appointment->time, 0, 5);
+                    $checkDoctor = $validated['doctor_id'] ?? $appointment->doctor_id;
+
+                    $conflict = \App\Models\Appointment::where('doctor_id', $checkDoctor)
+                        ->whereDate('date', $checkDate)
+                        ->whereRaw("LEFT(time, 5) = ?", [$checkTime])
+                        ->where('status', 'pendiente')
+                        ->where('id', '!=', $appointment->id)  // ← excluir la cita actual
+                        ->exists();
+
+                    if ($conflict) {
+                        return response()->json([
+                            'message' => 'Ese horario ya está ocupado por otra cita. Por favor selecciona otro.',
+                        ], 409);
+                    }
                 }
 
                 $appointment->update($validated);

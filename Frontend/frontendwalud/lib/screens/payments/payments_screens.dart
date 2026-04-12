@@ -1,913 +1,481 @@
+// lib/screens/dashboard/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/payment.dart';
-import '../../services/payment_service.dart';
-import 'create_payment_screen.dart';
+import '../../models/appointment.dart';
+import '../../models/user.dart';
+import '../../services/auth_service.dart';
+import '../../services/appointment_service.dart';
+import '../auth/login_screen.dart';
+import '../appointments/appointments_list_screen.dart';
+import '../appointments/create_appointment_screen.dart';
+// import '../payments/payments_screen.dart'; // TODO: habilitar cuando se implemente
+import '../profile/profile_screen.dart';
 
-class PaymentsScreen extends StatefulWidget {
-  const PaymentsScreen({super.key});
-
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
   @override
-  State<PaymentsScreen> createState() => _PaymentsScreenState();
+  State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _PaymentsScreenState extends State<PaymentsScreen> {
-  List<Payment> _all = [];
-  List<Payment> _pending = [];
-  List<Payment> _completed = [];
-  bool _isLoading = true;
-  String _historialFilter = 'Todos';
-  Map<String, dynamic> _summary = {};
-
-  final _fmt = NumberFormat('#,##0', 'es');
+class _DashboardScreenState extends State<DashboardScreen> {
+  int   _selectedIndex = 0;
+  User? _currentUser;
+  bool  _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadUser();
   }
 
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
-
-    final results = await Future.wait([
-      PaymentService.getAll(),
-      PaymentService.getSummary(),
-    ]);
-
-    final paymentsResult = results[0];
-    final summaryResult = results[1];
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (paymentsResult['success'] == true) {
-          _all = List<Payment>.from(paymentsResult['payments']);
-          _pending = _all
-              .where((p) => p.estadoPago == PaymentStatus.pendiente)
-              .toList();
-          _completed = _all
-              .where((p) => p.estadoPago == PaymentStatus.completado)
-              .toList();
-        }
-        if (summaryResult['success'] == true) {
-          _summary = Map<String, dynamic>.from(summaryResult['data'] ?? {});
-        }
-      });
-    }
+  Future<void> _loadUser() async {
+    final r = await AuthService.getCurrentUser();
+    if (mounted) setState(() { _isLoading = false; _currentUser = r['success'] ? r['user'] : null; });
   }
 
-  List<Payment> get _filteredHistorial {
-    switch (_historialFilter) {
-      case 'Consultas':
-        return _completed.where((p) => p.tipo == PaymentTipo.consulta).toList();
-      case 'Estudios':
-        return _completed.where((p) => p.tipo == PaymentTipo.estudio).toList();
-      default:
-        return _completed;
+  Future<void> _handleLogout() async {
+    await AuthService.logout();
+    if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+  }
+
+  List<_NavItem> get _navItems => [
+    _NavItem(icon: Icons.grid_view_rounded,     label: 'Inicio'),
+    _NavItem(icon: Icons.calendar_today_outlined,label: 'Citas'),
+    _NavItem(icon: Icons.history_outlined,       label: 'Historial'),
+    if (_currentUser?.isPatient == true)
+      // _NavItem(icon: Icons.payment_outlined, label: 'Pagos'), // TODO: habilitar
+    _NavItem(icon: Icons.headset_mic_outlined,   label: 'Soporte'),
+    _NavItem(icon: Icons.person_outline,           label: 'Perfil'),
+  ];
+
+  Widget _buildScreen(int idx) {
+    final isPatient = _currentUser?.isPatient == true;
+    switch (idx) {
+      case 0: return _HomeTab(user: _currentUser, onNavigate: (i) => setState(() => _selectedIndex = i));
+      case 1: return const AppointmentsListScreen();
+      case 2: return _HistorialTab();
+      case 3: return _SoporteTab(); // TODO: const PaymentsScreen() cuando se implemente
+      case 4: return _SoporteTab();
+      case 5: return const ProfileScreen();
+      default: return const SizedBox();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5))));
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: const Color(0xFF4F46E5),
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
-              )
-            : CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(child: _buildHeader()),
-                  SliverToBoxAdapter(child: _buildPendingSection()),
-                  SliverToBoxAdapter(child: _buildHistorialSection()),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
-              ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CreatePaymentScreen(onCreated: _load),
-          ),
-        ),
-        backgroundColor: const Color(0xFF4F46E5),
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Registrar',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+      backgroundColor: const Color(0xFFF0F4F8),
+      body: Row(
+        children: [
+          // ── Sidebar izquierdo
+          _buildSidebar(),
+          // ── Contenido
+          Expanded(child: _buildScreen(_selectedIndex)),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildSidebar() {
     return Container(
+      width: 220,
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pagos y Facturación',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A7A),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Administra tus servicios médicos, métodos de pago y descarga tus comprobantes fiscales en un solo lugar.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            // ✅ PayNowScreen está definida abajo en este mismo archivo
-            onPressed: _pending.isEmpty
-                ? null
-                : () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            PayNowScreen(payments: _pending, onPaid: _load),
-                      ),
-                    ),
-            icon: const Icon(Icons.receipt_long, size: 16),
-            label: const Text(
-              'Pagar Ahora',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A237E),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPendingSection() {
-    if (_pending.isEmpty) return const SizedBox();
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.schedule, color: Color(0xFF4F46E5), size: 18),
-                SizedBox(width: 8),
-                Text(
-                  'Pagos Pendientes',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Color(0xFF1A1A7A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ..._pending.map((p) => _buildPendingRow(p)),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPendingRow(Payment p) {
-    final vence = p.fechaVencimiento;
-    final isOverdue = vence != null && vence.isBefore(DateTime.now());
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF4F46E5).withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              _tipoIcon(p.tipo),
-              color: const Color(0xFF4F46E5),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  p.concepto,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF1A1A7A),
-                  ),
-                ),
-                if (vence != null)
-                  Text(
-                    '${isOverdue ? "Venció" : "Vence"}: ${DateFormat('d MMM').format(vence)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isOverdue ? Colors.red : Colors.grey[500],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$${_fmt.format(p.monto)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                  fontSize: 15,
-                ),
-              ),
-              if (vence != null)
-                Text(
-                  DateFormat('d MMM').format(vence),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isOverdue ? Colors.red : Colors.grey[500],
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistorialSection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          // Logo
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              children: [
-                const Icon(Icons.history, color: Color(0xFF4F46E5), size: 18),
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 18),
+                ),
                 const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Historial de Transacciones',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Color(0xFF1A1A7A),
+                const Text('Walud', style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A),
+                )),
+              ]),
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 34),
+                child: Text('SALUD DIGITAL', style: TextStyle(
+                  fontSize: 9, letterSpacing: 1.5, color: Colors.grey[400], fontWeight: FontWeight.w600,
+                )),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 32),
+
+          // Nav items
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _navItems.length,
+              itemBuilder: (_, i) {
+                final item   = _navItems[i];
+                final active = _selectedIndex == i;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedIndex = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: active ? const Color(0xFF4F46E5) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: active
+                          ? const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
+                              begin: Alignment.topLeft, end: Alignment.bottomRight)
+                          : null,
                     ),
+                    child: Row(children: [
+                      Icon(item.icon,
+                        color: active ? Colors.white : Colors.grey[500],
+                        size: 20),
+                      const SizedBox(width: 12),
+                      Text(item.label, style: TextStyle(
+                        color: active ? Colors.white : Colors.grey[600],
+                        fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 14,
+                      )),
+                    ]),
                   ),
-                ),
-                ...['Todos', 'Consultas', 'Estudios'].map((f) {
-                  final active = _historialFilter == f;
-                  return GestureDetector(
-                    onTap: () => setState(() => _historialFilter = f),
-                    child: Container(
-                      margin: const EdgeInsets.only(left: 4),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? const Color(0xFF4F46E5).withOpacity(0.1)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        f,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight:
-                              active ? FontWeight.bold : FontWeight.normal,
-                          color: active
-                              ? const Color(0xFF4F46E5)
-                              : Colors.grey[500],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
+                );
+              },
             ),
           ),
+
+          // Nueva Cita (solo paciente o médico)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(flex: 4, child: _tableHeader('CONCEPTO')),
-                Expanded(flex: 2, child: _tableHeader('FECHA')),
-                Expanded(flex: 2, child: _tableHeader('ESTADO')),
-                Expanded(flex: 2, child: _tableHeader('MONTO')),
-                const SizedBox(
-                  width: 60,
-                  child: Text(
-                    'ACCIÓN',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+            child: GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const CreateAppointmentScreen())),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F4FD),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
+                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.add, color: Color(0xFF4F46E5), size: 18),
+                  SizedBox(width: 6),
+                  Text('Nueva Cita', style: TextStyle(
+                    color: Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 13,
+                  )),
+                ]),
+              ),
+            ),
+          ),
+
+          // Divider + Ayuda + Cerrar sesión
+          Divider(height: 1, color: Colors.grey.shade100),
+          // ── Mini perfil en el sidebar
+          InkWell(
+            onTap: () => setState(() => _selectedIndex = 5),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: _currentUser?.hasPhoto != true
+                        ? const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)])
+                        : null,
+                    border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.3), width: 2),
+                  ),
+                  child: _currentUser?.hasPhoto == true
+                      ? ClipOval(child: Image.network(
+                          _currentUser!.fullPhotoUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(
+                              _currentUser?.name.isNotEmpty == true ? _currentUser!.name[0].toUpperCase() : '?',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ),
+                        ))
+                      : Center(
+                          child: Text(
+                            _currentUser?.name.isNotEmpty == true ? _currentUser!.name[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_currentUser?.fullName ?? 'Usuario',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A)),
+                    overflow: TextOverflow.ellipsis),
+                  Text(_currentUser?.isDoctor == true ? 'Médico' : 'Paciente',
+                    style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                ])),
+                const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+              ]),
             ),
           ),
           Divider(height: 1, color: Colors.grey.shade100),
-          if (_filteredHistorial.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(
-                child: Text(
-                  'No hay transacciones',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            )
-          else
-            ..._filteredHistorial.map((p) => _buildHistorialRow(p)),
+          _sidebarFooterItem(Icons.help_outline, 'Ayuda', () {}),
+          _sidebarFooterItem(Icons.logout, 'Cerrar Sesión', _handleLogout, isRed: true),
           const SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  Widget _tableHeader(String t) => Text(
-        t,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey,
-          letterSpacing: 0.5,
-        ),
-      );
-
-  Widget _buildHistorialRow(Payment p) {
-    final statusColor = Color(int.parse('0x${p.estadoPago.color}'));
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 4,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF06B6D4).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _tipoIcon(p.tipo),
-                        color: const Color(0xFF06B6D4),
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        p.concepto,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  p.fechaPago != null
-                      ? DateFormat('d MMM, yyyy').format(p.fechaPago!)
-                      : '-',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    p.estadoPago.label.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  '\$${_fmt.format(p.monto)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A7A),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 60,
-                child: TextButton(
-                  onPressed: () => _showPaymentDetail(p),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF4F46E5),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.receipt, size: 14),
-                      SizedBox(width: 2),
-                      Text('Factura', style: TextStyle(fontSize: 11)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Divider(
-          height: 1,
-          color: Colors.grey.shade100,
-          indent: 16,
-          endIndent: 16,
-        ),
-      ],
-    );
-  }
-
-  void _showPaymentDetail(Payment p) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        builder: (_, ctrl) => SingleChildScrollView(
-          controller: ctrl,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Row(
-                children: [
-                  Icon(Icons.receipt_long, color: Color(0xFF4F46E5)),
-                  SizedBox(width: 8),
-                  Text(
-                    'Detalle de Factura',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A7A),
-                    ),
-                  ),
-                ],
-              ),
-              const Divider(height: 24),
-              _detailRow('Concepto', p.concepto),
-              _detailRow('Tipo', p.tipo.label),
-              _detailRow('Monto', '\$${_fmt.format(p.monto)}'),
-              _detailRow('Estado', p.estadoPago.label),
-              if (p.fechaPago != null)
-                _detailRow(
-                  'Fecha de pago',
-                  DateFormat('d MMM yyyy').format(p.fechaPago!),
-                ),
-              if (p.metodoPago != null)
-                _detailRow(
-                  'Método',
-                  p.metodoPago!.name.replaceAll('_', ' '),
-                ),
-              if (p.referenciaPago != null)
-                _detailRow('Referencia', p.referenciaPago!),
-              if (p.notas != null && p.notas!.isNotEmpty)
-                _detailRow('Notas', p.notas!),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                  label: const Text('Cerrar'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF4F46E5),
-                    side: const BorderSide(color: Color(0xFF4F46E5)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _sidebarFooterItem(IconData icon, String label, VoidCallback onTap, {bool isRed = false}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
+        child: Row(children: [
+          Icon(icon, size: 18, color: isRed ? Colors.red.shade400 : Colors.grey[400]),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(
+            color: isRed ? Colors.red.shade400 : Colors.grey[500],
+            fontSize: 13,
+          )),
+        ]),
       ),
     );
-  }
-
-  Widget _detailRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 110,
-              child: Text(
-                label,
-                style: const TextStyle(color: Colors.grey, fontSize: 13),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                value,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A7A),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-
-  IconData _tipoIcon(PaymentTipo tipo) {
-    switch (tipo) {
-      case PaymentTipo.consulta:
-        return Icons.medical_services_outlined;
-      case PaymentTipo.estudio:
-        return Icons.biotech_outlined;
-      case PaymentTipo.seguro:
-        return Icons.shield_outlined;
-      case PaymentTipo.vacuna:
-        return Icons.vaccines_outlined;
-      case PaymentTipo.psicoterapia:
-        return Icons.psychology_outlined;
-      case PaymentTipo.otro:
-        return Icons.payment_outlined;
-    }
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PayNowScreen — incluida aquí para evitar importaciones externas
-// ─────────────────────────────────────────────────────────────────────────────
-class PayNowScreen extends StatefulWidget {
-  final List<Payment> payments;
-  final VoidCallback? onPaid;
+class _NavItem {
+  final IconData icon;
+  final String label;
+  const _NavItem({required this.icon, required this.label});
+}
 
-  const PayNowScreen({super.key, required this.payments, this.onPaid});
+// ── HOME TAB
+class _HomeTab extends StatefulWidget {
+  final User? user;
+  final Function(int) onNavigate;
+  const _HomeTab({this.user, required this.onNavigate});
 
   @override
-  State<PayNowScreen> createState() => _PayNowScreenState();
+  State<_HomeTab> createState() => _HomeTabState();
 }
 
-class _PayNowScreenState extends State<PayNowScreen> {
-  int? _selectedIdx;
-  PaymentMethod _method = PaymentMethod.tarjeta_credito;
-  bool _isPaying = false;
-  final _refCtrl = TextEditingController();
-  final _fmt = NumberFormat('#,##0', 'es');
+class _HomeTabState extends State<_HomeTab> {
+  Appointment? _nextAppointment;
 
-  Future<void> _pay() async {
-    if (_selectedIdx == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecciona un pago'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-    setState(() => _isPaying = true);
+  @override
+  void initState() {
+    super.initState();
+    _loadNext();
+  }
 
-    final p = widget.payments[_selectedIdx!];
-    final r = await PaymentService.pay(
-      p.id!,
-      _method.name,
-      referencia:
-          _refCtrl.text.trim().isNotEmpty ? _refCtrl.text.trim() : null,
-    );
-
-    setState(() => _isPaying = false);
-
-    if (mounted) {
-      if (r['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Pago procesado exitosamente'),
-            backgroundColor: Color(0xFF10B981),
-          ),
-        );
-        widget.onPaid?.call();
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(r['message']),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+  Future<void> _loadNext() async {
+    final r = await AppointmentService.getAll(status: 'pendiente');
+    if (r['success'] == true && mounted) {
+      final list = List<Appointment>.from(r['appointments']);
+      final now  = DateTime.now();
+      final upcoming = list.where((a) => a.dateTime.isAfter(now)).toList()
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      setState(() => _nextAppointment = upcoming.isNotEmpty ? upcoming.first : null);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Realizar Pago',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: const Color(0xFF4F46E5),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Selecciona el pago a realizar',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Color(0xFF1A1A7A),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...List.generate(widget.payments.length, (i) {
-              final p = widget.payments[i];
-              final sel = _selectedIdx == i;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedIdx = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: sel
-                        ? const Color(0xFF4F46E5).withOpacity(0.06)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: sel
-                          ? const Color(0xFF4F46E5)
-                          : Colors.grey.shade200,
-                      width: sel ? 2 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Radio<int>(
-                        value: i,
-                        groupValue: _selectedIdx,
-                        onChanged: (v) => setState(() => _selectedIdx = v),
-                        activeColor: const Color(0xFF4F46E5),
-                      ),
-                      Expanded(
-                        child: Text(
-                          p.concepto,
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      Text(
-                        '\$${_fmt.format(p.monto)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Método de pago',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Color(0xFF1A1A7A),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...PaymentMethod.values.map((m) {
-                    const icons = {
-                      PaymentMethod.tarjeta_credito: Icons.credit_card,
-                      PaymentMethod.tarjeta_debito:
-                          Icons.credit_card_outlined,
-                      PaymentMethod.transferencia: Icons.swap_horiz,
-                      PaymentMethod.efectivo: Icons.money,
-                      PaymentMethod.otro: Icons.payment,
-                    };
-                    const labels = {
-                      PaymentMethod.tarjeta_credito: 'Tarjeta de Crédito',
-                      PaymentMethod.tarjeta_debito: 'Tarjeta de Débito',
-                      PaymentMethod.transferencia: 'Transferencia Bancaria',
-                      PaymentMethod.efectivo: 'Efectivo',
-                      PaymentMethod.otro: 'Otro',
-                    };
-                    return RadioListTile<PaymentMethod>(
-                      value: m,
-                      groupValue: _method,
-                      onChanged: (v) => setState(() => _method = v!),
-                      activeColor: const Color(0xFF4F46E5),
-                      contentPadding: EdgeInsets.zero,
-                      title: Row(
-                        children: [
-                          Icon(
-                            icons[m],
-                            size: 18,
-                            color: const Color(0xFF4F46E5),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            labels[m]!,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Referencia (opcional)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _refCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'Número de transacción, recibo...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: Colors.grey.shade300),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isPaying ? null : _pay,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A237E),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: _isPaying
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.lock_outlined, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            _selectedIdx != null
-                                ? 'Pagar \$${_fmt.format(widget.payments[_selectedIdx!].monto)}'
-                                : 'Selecciona un pago',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
+    final user = widget.user;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header
+        Row(children: [
+          Expanded(
+            child: Text('Hola, ${user?.name ?? 'Usuario'}',
+              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A))),
+          ),
+          // Próxima cita card
+          if (_nextAppointment != null)
+            _NextAppointmentCard(appointment: _nextAppointment!),
+        ]),
+        const SizedBox(height: 36),
+
+        // Quick action cards
+        Row(children: [
+          Expanded(child: _QuickCard(
+            icon: Icons.calendar_month_outlined,
+            iconColor: const Color(0xFF4F46E5),
+            iconBg: const Color(0xFFEDE9FE),
+            title: 'Agendar Cita',
+            subtitle: 'Encuentra especialistas disponibles en tu zona hoy mismo para tu próxima revisión.',
+            actionLabel: 'Comenzar',
+            onTap: () => widget.onNavigate(1),
+          )),
+          const SizedBox(width: 20),
+          Expanded(child: _QuickCard(
+            icon: Icons.receipt_long_outlined,
+            iconColor: const Color(0xFF0D9488),
+            iconBg: const Color(0xFFCCFBF1),
+            title: 'Ver Historial',
+            subtitle: 'Accede a tus resultados, recetas y diagnósticos anteriores de forma segura.',
+            actionLabel: 'Consultar',
+            onTap: () => widget.onNavigate(2),
+          )),
+          if (user?.isPatient == true) ...[
+            const SizedBox(width: 20),
+            Expanded(child: _QuickCard(
+              icon: Icons.account_balance_wallet_outlined,
+              iconColor: const Color(0xFF7C3AED),
+              iconBg: const Color(0xFFEDE9FE),
+              title: 'Realizar Pago',
+              subtitle: 'Gestiona tus facturas pendientes y métodos de pago seguros vinculados a tu cuenta.',
+              actionLabel: 'Pagar ahora',
+              onTap: () => widget.onNavigate(3),
+            )),
           ],
-        ),
-      ),
+        ]),
+      ]),
     );
   }
+}
+
+class _NextAppointmentCard extends StatelessWidget {
+  final Appointment appointment;
+  const _NextAppointmentCard({required this.appointment});
 
   @override
-  void dispose() {
-    _refCtrl.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text('PRÓXIMA CITA', style: TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.bold)),
+          ),
+          const Spacer(),
+          const Icon(Icons.calendar_today, color: Colors.white54, size: 16),
+        ]),
+        const SizedBox(height: 14),
+        Text(appointment.doctorName,
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('${appointment.especialidad} • Clínica Walud',
+          style: const TextStyle(color: Colors.white60, fontSize: 12)),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('FECHA', style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+              Text(DateFormat('d MMM', 'es').format(appointment.dateTime),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            ]),
+            const SizedBox(width: 24),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('HORA', style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+              Text(DateFormat('hh:mm a').format(appointment.dateTime),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            ]),
+          ]),
+        ),
+      ]),
+    );
   }
+}
+
+class _QuickCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor, iconBg;
+  final String title, subtitle, actionLabel;
+  final VoidCallback onTap;
+
+  const _QuickCard({
+    required this.icon, required this.iconColor, required this.iconBg,
+    required this.title, required this.subtitle, required this.actionLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: iconColor, size: 24),
+        ),
+        const SizedBox(height: 20),
+        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
+        const SizedBox(height: 8),
+        Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 13, height: 1.5)),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: onTap,
+          child: Row(children: [
+            Text(actionLabel, style: const TextStyle(
+              color: Color(0xFF1A1A7A), fontWeight: FontWeight.bold, fontSize: 14,
+            )),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward, size: 16, color: Color(0xFF1A1A7A)),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _HistorialTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.history, size: 80, color: Color(0xFF4F46E5)),
+      SizedBox(height: 16),
+      Text('Historial Médico', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
+      SizedBox(height: 8),
+      Text('Próximamente disponible', style: TextStyle(color: Colors.grey)),
+    ]),
+  );
+}
+
+class _SoporteTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.headset_mic, size: 80, color: Color(0xFF4F46E5)),
+      SizedBox(height: 16),
+      Text('Soporte', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
+      SizedBox(height: 8),
+      Text('Próximamente disponible', style: TextStyle(color: Colors.grey)),
+    ]),
+  );
 }

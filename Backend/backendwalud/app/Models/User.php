@@ -1,7 +1,7 @@
 <?php
+// app/Models/User.php — versión con campos de perfil
 
 namespace App\Models;
-
 
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -11,51 +11,34 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable,HasApiTokens,HasRoles;
+    use HasFactory, Notifiable, HasApiTokens, HasRoles;
+
     protected $guard_name = 'api';
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
+
     protected $fillable = [
         'name',
+        'last_name',
         'email',
         'password',
         'tipo_usuario',
         'document',
         'tipo_documento',
-        'last_name',
         'birth_date',
+        'especialidad',
+        'profile_photo_path',  // ✅ nuevo
+        'phone',               // ✅ nuevo
     ];
 
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-    ];
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
-        'document' => 'integer', // Forzar casteo a entero
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
         ];
     }
 }

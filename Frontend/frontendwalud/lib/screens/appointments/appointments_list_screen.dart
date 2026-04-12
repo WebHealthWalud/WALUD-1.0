@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../config/constants.dart';
@@ -18,7 +19,7 @@ class AppointmentsListScreen extends StatefulWidget {
 class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
   List<Appointment> _all = [];
   bool   _isLoading = true;
-  String _filter    = 'todas';
+  String _filter    = 'Todas';
   User?  _currentUser;
 
   @override
@@ -30,28 +31,29 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
   Future<void> _init() async {
     final r = await AuthService.getCurrentUser();
     if (r['success'] && mounted) setState(() => _currentUser = r['user']);
-    _loadAppointments();
+    await _loadAppointments();
   }
 
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
     final r = await AppointmentService.getAll();
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _all = r['success'] ? List<Appointment>.from(r['appointments']) : [];
-      });
-    }
+    if (mounted) setState(() {
+      _isLoading = false;
+      _all = r['success'] == true ? List<Appointment>.from(r['appointments']) : [];
+    });
   }
 
   List<Appointment> get _filtered {
-    if (_filter == 'todas') return _all;
-    return _all.where((a) => a.status.name == _filter).toList();
+    switch (_filter) {
+      case 'Pendientes': return _all.where((a) => a.status == AppointmentStatus.pendiente).toList();
+      case 'Realizadas': return _all.where((a) => a.status == AppointmentStatus.realizada).toList();
+      case 'Canceladas': return _all.where((a) => a.status == AppointmentStatus.cancelada).toList();
+      default: return _all;
+    }
   }
 
-  // Próxima cita pendiente
   Appointment? get _nextAppointment {
-    final now = DateTime.now();
+    final now     = DateTime.now();
     final pending = _all.where((a) => a.status == AppointmentStatus.pendiente && a.dateTime.isAfter(now)).toList();
     if (pending.isEmpty) return null;
     pending.sort((a, b) => a.dateTime.compareTo(b.dateTime));
@@ -60,303 +62,302 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: RefreshIndicator(
-        onRefresh: _loadAppointments,
-        color: const Color(0xFF4F46E5),
-        child: CustomScrollView(
-          slivers: [
-            // ── Header
-            SliverToBoxAdapter(child: _buildHeader()),
-            // ── Próxima cita
-            if (_nextAppointment != null)
-              SliverToBoxAdapter(child: _buildNextAppointmentCard()),
-            // ── Filtros
-            SliverToBoxAdapter(child: _buildFilters()),
-            // ── Lista
-            if (_isLoading)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5))))
-            else if (_filtered.isEmpty)
-              SliverFillRemaining(child: _buildEmpty())
-            else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _buildAppointmentRow(_filtered[i]),
-                  childCount: _filtered.length,
+    return RefreshIndicator(
+      onRefresh: _loadAppointments,
+      color: const Color(0xFF4F46E5),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(28),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // ── Header con botón Agendar arriba a la derecha
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Mis Citas',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A))),
+              const SizedBox(height: 4),
+              Text('Gestiona y consulta el historial de tus consultas médicas.',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+            ])),
+            // ✅ Botón "Agendar Nueva Cita" en la parte superior derecha
+            if (_currentUser?.isPatient == true || _currentUser?.isDoctor == true)
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => CreateAppointmentScreen(onCreated: _loadAppointments))),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Agendar Nueva Cita', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A237E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
               ),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
-        ),
-      ),
-      floatingActionButton: _currentUser?.isPatient == true
-          ? FloatingActionButton.extended(
-              onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => CreateAppointmentScreen(onCreated: _loadAppointments))),
-              backgroundColor: const Color(0xFF4F46E5),
-              icon: const Icon(Icons.add),
-              label: const Text('Nueva Cita', style: TextStyle(fontWeight: FontWeight.bold)),
-            )
-          : null,
-    );
-  }
+          ]),
+          const SizedBox(height: 24),
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Mis Citas',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
-              Text('Gestiona y consulta el historial de tus consultas médicas.',
-                style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          // ── Próxima cita
+          if (_nextAppointment != null) ...[
+            _buildNextCard(_nextAppointment!),
+            const SizedBox(height: 24),
+          ],
+
+          // ── Tabla de citas
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: Column(children: [
+              // Filtros
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Row(children: [
+                  ...['Todas', 'Pendientes', 'Realizadas', 'Canceladas'].map((f) {
+                    final active = _filter == f;
+                    return GestureDetector(
+                      onTap: () => setState(() => _filter = f),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: active ? const Color(0xFF1A237E) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(f, style: TextStyle(
+                          color: active ? Colors.white : Colors.grey[500],
+                          fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        )),
+                      ),
+                    );
+                  }),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: Colors.grey.shade100),
+
+              // Cabecera tabla
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(children: [
+                  Expanded(flex: 3, child: _th(_currentUser?.isDoctor == true ? 'PACIENTE' : 'MÉDICO')),
+                  Expanded(flex: 2, child: _th('ESPECIALIDAD')),
+                  Expanded(flex: 2, child: _th('FECHA')),
+                  Expanded(flex: 1, child: _th('HORA')),
+                  Expanded(flex: 2, child: _th('ESTADO')),
+                  const SizedBox(width: 40, child: Text('', style: TextStyle())),
+                ]),
+              ),
+              Divider(height: 1, color: Colors.grey.shade100),
+
+              // Filas
+              if (_isLoading)
+                const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5))))
+              else if (_filtered.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Center(child: Column(children: [
+                    Icon(Icons.event_busy, size: 64, color: Colors.grey[300]),
+                    const SizedBox(height: 12),
+                    Text('No hay citas ${_filter == "Todas" ? "" : _filter.toLowerCase()}',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 15)),
+                  ])),
+                )
+              else
+                ..._filtered.asMap().entries.map((e) => _buildRow(e.value, e.key.isOdd)),
+
+              // Footer
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text('Mostrando ${_filtered.length} de ${_all.length} citas',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                  Row(children: [
+                    _pageBtn('< Anterior', false),
+                    const SizedBox(width: 8),
+                    _pageBtn('Siguiente >', false),
+                  ]),
+                ]),
+              ),
             ]),
           ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF4F46E5).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text('${_all.length}',
-              style: const TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 18)),
-          ),
-        ],
+        ]),
       ),
     );
   }
 
-  Widget _buildNextAppointmentCard() {
-    final next = _nextAppointment!;
+  Widget _buildNextCard(Appointment a) {
     final now  = DateTime.now();
-    final diff = next.dateTime.difference(now);
-    final isToday    = diff.inHours < 24 && next.dateTime.day == now.day;
-    final isTomorrow = next.dateTime.day == now.add(const Duration(days: 1)).day;
-    String cuando = isToday ? 'Hoy' : (isTomorrow ? 'Mañana' : DateFormat('d MMM', 'es').format(next.dateTime));
+    final diff = a.dateTime.difference(now);
+    final isToday = a.dateTime.day == now.day && a.dateTime.month == now.month;
+    final isTomorrow = a.dateTime.day == now.add(const Duration(days: 1)).day;
+    final cuando = isToday ? 'Hoy' : isTomorrow ? 'Mañana' : DateFormat('d MMM', 'es').format(a.dateTime);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1A237E), Color(0xFF4F46E5)],
+          colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 6))],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.notifications_active, color: Colors.white70, size: 16),
-          const SizedBox(width: 6),
-          const Text('Siguiente Consulta', style: TextStyle(color: Colors.white70, fontSize: 13)),
-        ]),
-        const SizedBox(height: 10),
-        Text('Tu próxima cita es con ${next.doctorName} ${diff.inHours < 24 ? "en menos de 24 horas." : "."}',
-          style: const TextStyle(color: Colors.white, fontSize: 14)),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('FECHA', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
-              Text(cuando, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ])),
-            Container(width: 1, height: 36, color: Colors.white24),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('HORA', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
-                  Text(DateFormat('hh:mm a').format(next.dateTime),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                ]),
-              ),
-            ),
+      child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.notifications_active, color: Colors.white70, size: 16),
+            const SizedBox(width: 6),
+            const Text('Siguiente Consulta', style: TextStyle(color: Colors.white70, fontSize: 13)),
           ]),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => AppointmentDetailScreen(appointment: next, onChanged: _loadAppointments))),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF06B6D4),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Ver Preparación', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(
+            // ✅ Médico ve nombre del paciente; paciente ve nombre del doctor
+            _currentUser?.isDoctor == true
+                ? 'Tu próxima consulta con ${a.patientName}${diff.inHours < 24 ? " es en menos de 24 horas." : "."}'
+                : 'Tu próxima cita es con ${a.doctorName}${diff.inHours < 24 ? " en menos de 24 horas." : "."}',
+            style: const TextStyle(color: Colors.white, fontSize: 14),
           ),
-        ),
-      ]),
-    );
-  }
-
-  Widget _buildFilters() {
-    final filters = [
-      {'key': 'todas',    'label': 'Todas'},
-      {'key': 'pendiente','label': 'Pendientes'},
-      {'key': 'realizada','label': 'Realizadas'},
-      {'key': 'cancelada','label': 'Canceladas'},
-    ];
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          // Tabla de citas header
-          Expanded(child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: filters.map((f) {
-                final active = _filter == f['key'];
-                return GestureDetector(
-                  onTap: () => setState(() => _filter = f['key']!),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8, bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: active ? const Color(0xFF4F46E5) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: active ? const Color(0xFF4F46E5) : Colors.grey.shade300),
-                    ),
-                    child: Text(f['label']!,
-                      style: TextStyle(
-                        color: active ? Colors.white : Colors.grey[600],
-                        fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 13,
-                      )),
-                  ),
-                );
-              }).toList(),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
-          )),
-        ]),
-        // Columnas de tabla
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(children: [
-            Expanded(flex: 3, child: _colHeader('MÉDICO')),
-            Expanded(flex: 2, child: _colHeader('ESPECIALIDAD')),
-            Expanded(flex: 2, child: _colHeader('FECHA')),
-            Expanded(flex: 2, child: _colHeader('ESTADO')),
-            const SizedBox(width: 32),
-          ]),
-        ),
-        Divider(height: 1, color: Colors.grey.shade200),
-      ]),
-    );
-  }
-
-  Widget _colHeader(String text) =>
-    Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5), letterSpacing: 0.5));
-
-  Widget _buildAppointmentRow(Appointment a) {
-    final statusColor = Color(int.parse('0x${a.statusColor}'));
-    return Container(
-      color: Colors.white,
-      child: Column(children: [
-        InkWell(
-          onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments))),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(children: [
-              // Doctor
-              Expanded(flex: 3, child: Row(children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: const Color(0xFF4F46E5).withOpacity(0.1),
-                  child: const Icon(Icons.person, color: Color(0xFF4F46E5), size: 18),
-                ),
-                const SizedBox(width: 8),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(a.doctorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4F46E5))),
-                  Text('ID: #${a.id ?? '-'}', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                ])),
-              ])),
-              // Especialidad
-              Expanded(flex: 2, child: Text(
-                especialidadLabel(a.especialidad),
-                style: TextStyle(fontSize: 11, color: Colors.grey[700]),
-                maxLines: 2, overflow: TextOverflow.ellipsis,
-              )),
-              // Fecha
-              Expanded(flex: 2, child: Text(
-                DateFormat('d MMM,\nyyyy').format(a.dateTime),
-                style: TextStyle(fontSize: 11, color: Colors.grey[700]),
-              )),
-              // Estado
-              Expanded(flex: 2, child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  Text(a.statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                ]),
-              )),
-              // Acciones
-              IconButton(
-                icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
-                onPressed: () => _showOptions(a),
-              ),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('FECHA', style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+                Text(cuando, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ]),
+              const SizedBox(width: 1, child: VerticalDivider(color: Colors.white24, thickness: 1)),
+              const SizedBox(width: 20),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('HORA', style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+                Text(DateFormat('hh:mm a').format(a.dateTime),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ]),
             ]),
           ),
+        ])),
+        const SizedBox(width: 20),
+        ElevatedButton(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments))),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF06B6D4),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Ver Preparación', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
-        Divider(height: 1, color: Colors.grey.shade100, indent: 20, endIndent: 20),
       ]),
     );
   }
 
-  void _showOptions(Appointment a) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 8),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.visibility, color: Color(0xFF4F46E5)),
-            title: const Text('Ver detalle'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments)));
-            },
-          ),
-          if (a.status == AppointmentStatus.pendiente && _currentUser?.isPatient == true)
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.orange),
-              title: const Text('Editar cita'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments, editMode: true)));
-              },
+  Widget _buildRow(Appointment a, bool shaded) {
+    final statusColor = Color(int.parse('0x${a.statusColor}'));
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+        builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments))),
+      child: Container(
+        color: shaded ? const Color(0xFFFAFAFC) : Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(children: [
+          // Médico / Paciente según rol
+          Expanded(flex: 3, child: Row(children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF4F46E5).withOpacity(0.1),
+              child: const Icon(Icons.person, color: Color(0xFF4F46E5), size: 18),
             ),
-          if (_currentUser?.isPatient == true)
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Eliminar cita', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(a);
-              },
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // ✅ Médico ve nombre del paciente; paciente ve nombre del doctor
+              Text(
+                _currentUser?.isDoctor == true ? a.patientName : a.doctorName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4F46E5)),
+              ),
+              Text('ID: #${a.id ?? "-"}', style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+            ])),
+          ])),
+          // Especialidad
+          Expanded(flex: 2, child: Text(
+            especialidadLabel(a.especialidad),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            maxLines: 2, overflow: TextOverflow.ellipsis,
+          )),
+          // Fecha
+          Expanded(flex: 2, child: Text(
+            DateFormat('d MMM,\nyyyy').format(a.dateTime),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          )),
+          // Hora
+          Expanded(flex: 1, child: Text(
+            DateFormat('hh:mm a').format(a.dateTime),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          )),
+          // Estado badge
+          Expanded(flex: 2, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
             ),
-          const SizedBox(height: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              Text(a.statusLabel, style: TextStyle(
+                color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
+            ]),
+          )),
+          // Acciones
+          SizedBox(width: 40, child: IconButton(
+            icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+            onPressed: () => _showMenu(a),
+          )),
         ]),
       ),
+    );
+  }
+
+  void _showMenu(Appointment a) {
+    showModalBottomSheet(context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 8),
+        Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 16),
+        ListTile(
+          leading: const Icon(Icons.visibility, color: Color(0xFF4F46E5)),
+          title: const Text('Ver detalle'),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments)));
+          },
+        ),
+        if (a.status == AppointmentStatus.pendiente && (_currentUser?.isPatient == true || _currentUser?.isDoctor == true))
+          ListTile(
+            leading: const Icon(Icons.edit_outlined, color: Colors.orange),
+            title: const Text('Editar cita'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => AppointmentDetailScreen(appointment: a, onChanged: _loadAppointments, editMode: true)));
+            },
+          ),
+        if (_currentUser?.isPatient == true)
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: Colors.red),
+            title: const Text('Eliminar cita', style: TextStyle(color: Colors.red)),
+            onTap: () { Navigator.pop(context); _confirmDelete(a); },
+          ),
+        const SizedBox(height: 8),
+      ])),
     );
   }
 
@@ -364,7 +365,7 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
     showDialog(context: context, builder: (_) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Eliminar cita'),
-      content: const Text('¿Estás seguro de que deseas eliminar esta cita? Esta acción no se puede deshacer.'),
+      content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         ElevatedButton(
@@ -373,10 +374,8 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
             final r = await AppointmentService.delete(a.id!);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(r['message']),
-                backgroundColor: r['success'] ? Colors.green : Colors.red,
-              ));
-              if (r['success']) _loadAppointments();
+                content: Text(r['message']), backgroundColor: r['success'] ? Colors.green : Colors.red));
+              if (r['success'] == true) _loadAppointments();
             }
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
@@ -386,18 +385,11 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
     ));
   }
 
-  Widget _buildEmpty() {
-    return Center(
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.event_busy, size: 80, color: Colors.grey[300]),
-        const SizedBox(height: 16),
-        Text('No hay citas ${_filter == "todas" ? "" : _filter + "s"}',
-          style: TextStyle(fontSize: 18, color: Colors.grey[500], fontWeight: FontWeight.w500)),
-        if (_currentUser?.isPatient == true && _filter == 'todas') ...[
-          const SizedBox(height: 8),
-          Text('Agenda tu primera cita', style: TextStyle(color: Colors.grey[400])),
-        ],
-      ]),
-    );
-  }
+  Widget _th(String t) => Text(t, style: const TextStyle(
+    fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5), letterSpacing: 0.5));
+
+  Widget _pageBtn(String label, bool enabled) => TextButton(
+    onPressed: enabled ? () {} : null,
+    child: Text(label, style: TextStyle(color: enabled ? const Color(0xFF4F46E5) : Colors.grey[400], fontSize: 12)),
+  );
 }
