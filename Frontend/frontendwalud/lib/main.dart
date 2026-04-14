@@ -3,12 +3,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'services/auth_service.dart';
+import 'screens/landing/landing_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); 
   runApp(const WaludApp());
 }
 
+// LandingPage
 class WaludApp extends StatelessWidget {
   const WaludApp({super.key});
 
@@ -30,8 +32,10 @@ class WaludApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      // Pantalla inicial que verifica sesión
-      home: const AuthWrapper(),
+      // Cambiar a LandingPage como página inicial
+      home: const LandingPage(),
+      // O mantener AuthWrapper si quieres verificar sesión:
+      // home: const AuthWrapper(),
     );
   }
 }
