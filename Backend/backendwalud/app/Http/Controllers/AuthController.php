@@ -94,8 +94,19 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logout exitoso']);
     }
 
-    public function me(Request $request)
-    {
-        return response()->json($request->user());
+   public function me(Request $request)
+{
+    $user = $request->user();
+    
+    // ✅ Construir photo_url via API
+    $photoUrl = null;
+    if ($user->profile_photo_path) {
+        $filename = basename($user->profile_photo_path);
+        $photoUrl = url("api/image/profile_photos/{$filename}");
     }
+
+    return response()->json(array_merge($user->toArray(), [
+        'photo_url' => $photoUrl,
+    ]));
+}
 }

@@ -1,4 +1,4 @@
-// lib/models/user.dart — actualizado con profilePhotoPath y phone
+// lib/models/user.dart
 
 enum DocumentType {
   cedulaCiudadania, tarjetaIdentidad, registroCivil, cedulaExtranjeria,
@@ -53,9 +53,9 @@ class User {
   final String?       userType;
   final String?       especialidad;
   final String?       token;
-  final String?       profilePhotoPath; // ✅ nuevo
-  final String?       photoUrl;         // ✅ nuevo — URL pública de la foto
-  final String?       phone;            // ✅ nuevo
+  final String?       profilePhotoPath;
+  final String?       photoUrl;
+  final String?       phone;
 
   User({
     this.id,
@@ -106,15 +106,39 @@ class User {
     'phone':          phone,
   };
 
-  String get fullName    => '$name ${lastName ?? ''}'.trim();
-  bool   get isDoctor    => userType == 'medico';
-  bool   get isPatient   => userType == 'paciente';
-  bool   get hasPhoto    => photoUrl != null && photoUrl!.isNotEmpty;
+  String get fullName  => '$name ${lastName ?? ''}'.trim();
+  bool   get isDoctor  => userType == 'medico';
+  bool   get isPatient => userType == 'paciente';
 
-  // ✅ URL completa de la foto para mostrar en la app
+  // ✅ FIX: hasPhoto verifica tanto photoUrl como profilePhotoPath
+  bool get hasPhoto =>
+      (photoUrl != null && photoUrl!.isNotEmpty) ||
+      (profilePhotoPath != null && profilePhotoPath!.isNotEmpty);
+
+  // ✅ FIX: fullPhotoUrl convierte cualquier URL a la ruta de la API con CORS
   String? get fullPhotoUrl {
-    if (photoUrl == null) return null;
-    if (photoUrl!.startsWith('http')) return photoUrl;
-    return 'http://127.0.0.1:8000$photoUrl';
+    // Si ya es URL de la API (/api/image/...) úsala directo
+    if (photoUrl != null && photoUrl!.contains('/api/image/')) {
+      return photoUrl;
+    }
+
+    // Si es URL completa de storage, extraer filename y convertir a API
+    if (photoUrl != null && photoUrl!.contains('/storage/')) {
+      final filename = photoUrl!.split('/').last.split('?').first;
+      return 'http://127.0.0.1:8000/api/image/profile_photos/$filename';
+    }
+
+    // Si photoUrl existe y empieza con http (URL directa de la API)
+    if (photoUrl != null && photoUrl!.startsWith('http')) {
+      return photoUrl;
+    }
+
+    // Si solo tenemos profilePhotoPath (ruta interna del servidor)
+    if (profilePhotoPath != null && profilePhotoPath!.isNotEmpty) {
+      final filename = profilePhotoPath!.split('/').last;
+      return 'http://127.0.0.1:8000/api/image/profile_photos/$filename';
+    }
+
+    return null;
   }
 }

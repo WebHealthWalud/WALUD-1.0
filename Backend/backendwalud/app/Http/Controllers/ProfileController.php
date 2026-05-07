@@ -42,28 +42,32 @@ class ProfileController extends Controller
 
     // ── Subir foto de perfil
     public function uploadPhoto(Request $request)
-    {
-        $request->validate([
-            'photo' => 'required|file|max:5120|mimes:jpg,jpeg,png,webp',
-        ]);
+{
+    $request->validate([
+        'photo' => 'required|file|max:5120|mimes:jpg,jpeg,png,webp',
+    ]);
 
-        $user = $request->user();
+    $user = $request->user();
 
-        // Eliminar foto anterior si existe
-        if ($user->profile_photo_path) {
-            Storage::disk('public')->delete($user->profile_photo_path);
-        }
-
-        $path = $request->file('photo')->store('profile_photos', 'public');
-
-        $user->update(['profile_photo_path' => $path]);
-
-        return response()->json([
-            'success'   => true,
-            'message'   => 'Foto de perfil actualizada',
-            'photo_url' => Storage::url($path),
-        ]);
+    if ($user->profile_photo_path) {
+        Storage::disk('public')->delete($user->profile_photo_path);
     }
+
+    $file = $request->file('photo');
+    $path = $file->store('profile_photos', 'public');
+    $filename = basename($path);
+
+    $user->update(['profile_photo_path' => $path]);
+
+    // ✅ URL a través de la API, no de storage directo
+    $apiUrl = url("api/image/profile_photos/{$filename}");
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Foto de perfil actualizada',
+        'photo_url' => $apiUrl,
+    ]);
+}
 
     // ── Cambiar contraseña
     public function changePassword(Request $request)
@@ -116,22 +120,26 @@ class ProfileController extends Controller
     }
 
     private function formatUser($user): array
-    {
-        return [
-            'id'                 => $user->id,
-            'name'               => $user->name,
-            'last_name'          => $user->last_name,
-            'email'              => $user->email,
-            'document'           => $user->document,
-            'tipo_documento'     => $user->tipo_documento,
-            'birth_date'         => $user->birth_date,
-            'phone'              => $user->phone,
-            'tipo_usuario'       => $user->tipo_usuario,
-            'especialidad'       => $user->especialidad,
-            'profile_photo_path' => $user->profile_photo_path,
-            'photo_url'          => $user->profile_photo_path
-                ? Storage::url($user->profile_photo_path)
-                : null,
-        ];
+{
+    $photoUrl = null;
+    if ($user->profile_photo_path) {
+        $filename = basename($user->profile_photo_path);
+        $photoUrl = url("api/image/profile_photos/{$filename}");
     }
+
+    return [
+        'id'                 => $user->id,
+        'name'               => $user->name,
+        'last_name'          => $user->last_name,
+        'email'              => $user->email,
+        'document'           => $user->document,
+        'tipo_documento'     => $user->tipo_documento,
+        'birth_date'         => $user->birth_date,
+        'phone'              => $user->phone,
+        'tipo_usuario'       => $user->tipo_usuario,
+        'especialidad'       => $user->especialidad,
+        'profile_photo_path' => $user->profile_photo_path,
+        'photo_url'          => $photoUrl, // ✅ URL via API
+    ];
+}
 }

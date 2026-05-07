@@ -8,7 +8,6 @@ import '../../services/appointment_service.dart';
 import '../auth/login_screen.dart';
 import '../appointments/appointments_list_screen.dart';
 import '../appointments/create_appointment_screen.dart';
-// import '../payments/payments_screen.dart'; // TODO: habilitar cuando se implemente
 import '../profile/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -38,31 +37,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
-  List<_NavItem> get _navItems => [
-    _NavItem(icon: Icons.grid_view_rounded,     label: 'Inicio'),
-    _NavItem(icon: Icons.calendar_today_outlined,label: 'Citas'),
-    _NavItem(icon: Icons.history_outlined,       label: 'Historial'),
-    if (_currentUser?.isPatient == true)
-      // _NavItem(icon: Icons.payment_outlined, label: 'Pagos'), // TODO: habilitar
-    _NavItem(icon: Icons.headset_mic_outlined,   label: 'Soporte'),
-    _NavItem(icon: Icons.person_outline,           label: 'Perfil'),
-  ];
+  // ✅ FIX 1: _navItems como método para evitar problemas con índices dinámicos
+  List<_NavItem> get _navItems {
+    final items = <_NavItem>[
+      _NavItem(icon: Icons.grid_view_rounded,      label: 'Inicio'),
+      _NavItem(icon: Icons.calendar_today_outlined, label: 'Citas'),
+      _NavItem(icon: Icons.history_outlined,        label: 'Historial'),
+    ];
+    if (_currentUser?.isPatient == true) {
+      items.add(_NavItem(icon: Icons.headset_mic_outlined, label: 'Soporte'));
+    }
+    // Perfil siempre es el último
+    items.add(_NavItem(icon: Icons.person_outline, label: 'Perfil'));
+    return items;
+  }
+
+  // ✅ FIX 2: índice de perfil calculado dinámicamente
+  int get _perfilIndex => _navItems.length - 1;
+  int get _soporteIndex => _currentUser?.isPatient == true ? 3 : -1;
 
   Widget _buildScreen(int idx) {
-    final isPatient = _currentUser?.isPatient == true;
-    switch (idx) {
-      case 0: return _HomeTab(user: _currentUser, onNavigate: (i) => setState(() => _selectedIndex = i));
-      case 1: return const AppointmentsListScreen();
-      case 2: return _HistorialTab();
-      case 3: return _SoporteTab(); // TODO: const PaymentsScreen() cuando se implemente
-      case 4: return _SoporteTab();
-      case 5: return ProfileScreen(onProfileUpdated: () async {
-        // ✅ Recargar usuario cuando el perfil se actualiza
-        await _loadUser();
-        setState(() {});
-      });
-      default: return const SizedBox();
+    if (idx == 0) {
+      return _HomeTab(
+        user: _currentUser,
+        onNavigate: (i) => setState(() => _selectedIndex = i),
+      );
     }
+    if (idx == 1) return const AppointmentsListScreen();
+    if (idx == 2) return _HistorialTab();
+    if (idx == _soporteIndex) return _SoporteTab();
+    if (idx == _perfilIndex) {
+      return ProfileScreen(
+        onProfileUpdated: () async {
+          // ✅ FIX 3: recargar usuario y actualizar foto en sidebar
+          await _loadUser();
+          setState(() {});
+        },
+      );
+    }
+    return const SizedBox();
   }
 
   @override
@@ -75,9 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: const Color(0xFFF0F4F8),
       body: Row(
         children: [
-          // ── Sidebar izquierdo
           _buildSidebar(),
-          // ── Contenido
           Expanded(child: _buildScreen(_selectedIndex)),
         ],
       ),
@@ -138,8 +149,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: active ? const Color(0xFF4F46E5) : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                       gradient: active
-                          ? const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
-                              begin: Alignment.topLeft, end: Alignment.bottomRight)
+                          ? const LinearGradient(
+                              colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
                           : null,
                     ),
                     child: Row(children: [
@@ -159,7 +173,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          // Nueva Cita (solo paciente o médico)
+          // Nueva Cita
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
             child: GestureDetector(
@@ -182,14 +196,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          // Divider + Ayuda + Cerrar sesión
           Divider(height: 1, color: Colors.grey.shade100),
-          // ── Mini perfil en el sidebar
+
+          // ✅ FIX 4: Mini perfil — onTap usa _perfilIndex dinámico
           InkWell(
-            onTap: () => setState(() => _selectedIndex = 5),
+            onTap: () => setState(() => _selectedIndex = _perfilIndex),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(children: [
+                // ✅ FIX 5: Avatar con key para forzar recarga al cambiar foto
                 Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(
@@ -200,20 +215,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.3), width: 2),
                   ),
                   child: _currentUser?.hasPhoto == true
-                      ? ClipOval(child: Image.network(
-                          '${_currentUser!.fullPhotoUrl!}?t=${DateTime.now().millisecondsSinceEpoch}',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
-                            child: Text(
-                              _currentUser?.name.isNotEmpty == true ? _currentUser!.name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ? ClipOval(
+                          child: Image.network(
+                            // ✅ timestamp para evitar caché del navegador
+                            '${_currentUser!.fullPhotoUrl!}?t=${DateTime.now().millisecondsSinceEpoch}',
+                            key: ValueKey(_currentUser!.fullPhotoUrl),
+                            fit: BoxFit.cover,
+                            width: 36,
+                            height: 36,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                _currentUser?.name.isNotEmpty == true
+                                    ? _currentUser!.name[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
                           ),
-                        ))
+                        )
                       : Center(
                           child: Text(
-                            _currentUser?.name.isNotEmpty == true ? _currentUser!.name[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            _currentUser?.name.isNotEmpty == true
+                                ? _currentUser!.name[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                 ),
@@ -229,6 +262,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]),
             ),
           ),
+
           Divider(height: 1, color: Colors.grey.shade100),
           _sidebarFooterItem(Icons.help_outline, 'Ayuda', () {}),
           _sidebarFooterItem(Icons.logout, 'Cerrar Sesión', _handleLogout, isRed: true),
@@ -298,19 +332,15 @@ class _HomeTabState extends State<_HomeTab> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header
         Row(children: [
           Expanded(
             child: Text('Hola, ${user?.name ?? 'Usuario'}',
               style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A))),
           ),
-          // Próxima cita card
           if (_nextAppointment != null)
             _NextAppointmentCard(appointment: _nextAppointment!),
         ]),
         const SizedBox(height: 36),
-
-        // Quick action cards
         Row(children: [
           Expanded(child: _QuickCard(
             icon: Icons.calendar_month_outlined,
