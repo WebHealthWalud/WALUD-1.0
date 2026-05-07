@@ -4,10 +4,12 @@
 
 <div align="center">
 
+<h4> Proyecto formativo desarrollado por aprendices SENA </h4>
+
 <h1> 🏥 WALUD – Plataforma Digital de Servicios de Salud </h1>
 
 > 👩🏻‍💻👨🏻‍💻 **Equipo Walud**
-Walud es una plataforma digital que permite a pacientes y médicos gestionar consultas médicas en línea, incluyendo agendamiento de citas, historial médico y pagos digitales.
+Walud una plataforma digital que permite a pacientes y médicos gestionar consultas médicas en línea, incluyendo agendamiento de citas, historial médico y pagos digitales.
 
 </div>
 
@@ -256,7 +258,17 @@ El despliegue del proyecto está planificado en las siguientes plataformas:
 
 ## 🖼️ Evidencias
 
-> 📌 Próximamente se agregarán capturas de pantalla del sistema en funcionamiento.
+---
+
+<img width="1600" height="589" alt="Landing" src="https://github.com/user-attachments/assets/c8a65285-73e6-4d73-a878-4c8936b0525b" />
+
+---
+
+<img width="1600" height="757" alt="Inicio de Sesión" src="https://github.com/user-attachments/assets/fe90fcc9-82f8-4a82-b6e3-e8419c3683e3" />
+
+---
+
+<img width="1600" height="766" alt="Pagina Principal" src="https://github.com/user-attachments/assets/57a950f7-8ab7-460f-ad28-0e0068fc45e4" />
 
 ---
 
