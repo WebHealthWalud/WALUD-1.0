@@ -13,6 +13,12 @@ Walud es una plataforma digital que permite a pacientes y médicos gestionar con
 
 ---
 
+## 📋 Descripción
+
+Walud resuelve la dificultad de acceder a servicios de salud de forma presencial y desorganizada. Permite a pacientes agendar citas médicas en línea, consultar su historial clínico y realizar pagos digitales, mientras que los médicos pueden gestionar su agenda y el seguimiento de sus pacientes desde cualquier lugar.
+
+---
+
 # 🚀 Creación del Proyecto Base
 
 ## 📁 Estructura Inicial
@@ -48,6 +54,11 @@ cp .env.example .env
 php artisan key:generate
 php artisan migrate
 php artisan serve
+```
+
+### 🖥️ Funcionalidades Especiales 
+```bash
+php artisan storage:link
 ```
 
 ---
@@ -99,6 +110,35 @@ DB_PASSWORD=
 
 ---
 
+## 🛠️ Tecnologías Utilizadas
+
+| Capa | Tecnología |
+|------|------------|
+| Lenguaje Backend | PHP |
+| Framework Backend | Laravel |
+| Lenguaje Frontend | Dart |
+| Framework Frontend | Flutter |
+| Base de datos | MySQL |
+| Autenticación | Laravel Sanctum |
+| Permisos | Spatie Laravel Permission |
+| Gestión de estado | Provider |
+
+---
+
+## ✅ Requisitos Previos
+
+Antes de ejecutar el proyecto asegúrate de tener instalado:
+
+- **PHP** >= 8.1
+- **Composer**
+- **Laravel CLI**
+- **MySQL** >= 8.0
+- **Flutter SDK** >= 3.x
+- **Dart SDK** (incluido con Flutter)
+- **Git**
+
+---
+
 # 🌿 Estructura del Repositorio
 
 ## 📛 Nombre del repositorio
@@ -111,6 +151,7 @@ DB_PASSWORD=
 
 * `main` → versión estable
 * `develop` → desarrollo general
+* `document` → cambios de forma aislada
 * `feature/*` → nuevas funcionalidades
 * `fix/*` → corrección de errores
 * `backend/*` → desarrollo por rol
@@ -152,10 +193,77 @@ walud/
 
 ---
 
+## 🗄️ Base de Datos
+
+Para crear la base de datos ejecuta las migraciones de Laravel:
+
+```bash
+cd backend
+php artisan migrate
+```
+
+Si el proyecto incluye datos de prueba (seeders):
+
+```bash
+php artisan db:seed
+```
+
+Asegúrate de haber configurado correctamente las variables `DB_*` en tu archivo `.env` antes de correr estos comandos.
+
+---
+
+## 🔐 Variables de Entorno
+
+| Variable | Descripción |
+|----------|-------------|
+| `APP_NAME` | Nombre de la aplicación |
+| `APP_ENV` | Entorno (`local`, `production`) |
+| `APP_KEY` | Clave de cifrado de Laravel (generada con `artisan key:generate`) |
+| `APP_DEBUG` | Modo debug (`true` / `false`) |
+| `APP_URL` | URL base del backend |
+| `DB_CONNECTION` | Tipo de base de datos (`mysql`) |
+| `DB_HOST` | Host de la base de datos |
+| `DB_PORT` | Puerto de conexión (por defecto `3306`) |
+| `DB_DATABASE` | Nombre de la base de datos |
+| `DB_USERNAME` | Usuario de la base de datos |
+| `DB_PASSWORD` | Contraseña de la base de datos |
+
+---
+
+## 🧪 Usuario de Prueba
+
+> ⚠️ Solo disponible en entorno local con seeders ejecutados.
+
+> 📌 Próximamente se agragará los datos correspondientes
+
+---
+
+## 🚀 Despliegue
+
+El despliegue del proyecto está planificado en las siguientes plataformas:
+
+- **Backend (Laravel):** [Railway](https://railway.app) / [Render](https://render.com)
+- **Base de datos:** PlanetScale o MySQL en el mismo servicio
+- **Frontend (Flutter Web):** Firebase Hosting / Netlify
+
+**Pasos generales:**
+1. Configura las variables de entorno en la plataforma elegida.
+2. Conecta el repositorio de GitHub.
+3. Ejecuta `php artisan migrate` en el entorno de producción.
+4. Compila el frontend con `flutter build web` y despliega la carpeta `build/web`.
+
+---
+
+## 🖼️ Evidencias
+
+> 📌 Próximamente se agregarán capturas de pantalla del sistema en funcionamiento.
+
+---
+
 ## 👥 Equipo de Desarrollo
 
-* **Yeisson Romero** → Backend + Base de Datos
-* **Sarah González** → Frontend + Base de Datos + Documentación
+* **👴 Yeisson Romero [YeissonR21](https://github.com/YeissonR21)** → Backend + Base de Datos
+* **🐈‍⬛ Sarah González [Kata45](https://github.com/Kata45)** → Frontend + Base de Datos + Documentación
 
 ---
 
