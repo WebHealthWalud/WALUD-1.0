@@ -1,5 +1,3 @@
-// lib/models/user.dart
-
 enum DocumentType {
   cedulaCiudadania, tarjetaIdentidad, registroCivil, cedulaExtranjeria,
   carneDiplomatico, pasaporte, permisoEspecialPermanencia, permisoProteccionTemporal,
@@ -42,20 +40,37 @@ extension DocumentTypeExtension on DocumentType {
   }
 }
 
+const List<String> kTiposSangre = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'desconocido'];
+
+const List<Map<String, String>> kGeneros = [
+  {'value': 'masculino',         'label': 'Masculino'},
+  {'value': 'femenino',          'label': 'Femenino'},
+  {'value': 'otro',              'label': 'Otro'},
+  {'value': 'prefiero_no_decir', 'label': 'Prefiero no decir'},
+];
+
 class User {
-  final int?          id;
-  final String        name;
-  final String        email;
-  final int?          document;
+  final int? id;
+  final String name;
+  final String email;
+  final int? document;
   final DocumentType? documentType;
-  final String?       lastName;
-  final String?       birthDate;
-  final String?       userType;
-  final String?       especialidad;
-  final String?       token;
-  final String?       profilePhotoPath;
-  final String?       photoUrl;
-  final String?       phone;
+  final String? lastName;
+  final String? birthDate;
+  final String? userType;       // mantenido para retrocompatibilidad
+  final String? especialidad;
+  final String? token;
+  final String? profilePhotoPath;
+  final String? photoUrl;
+  final String? phone;
+  // Nuevos campos
+  final String? genero;
+  final String? tipoSangre;
+  final String? alergias;
+  final bool notificacionesEmail;
+  final bool notificacionesSms;
+  final bool isActive;
+  final List<String> roles; // roles Spatie
 
   User({
     this.id,
@@ -71,74 +86,91 @@ class User {
     this.profilePhotoPath,
     this.photoUrl,
     this.phone,
+    this.genero,
+    this.tipoSangre,
+    this.alergias,
+    this.notificacionesEmail = true,
+    this.notificacionesSms   = false,
+    this.isActive            = true,
+    this.roles               = const [],
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    List<String> roleList = [];
+    if (json['roles'] != null) {
+      final r = json['roles'];
+      if (r is List) {
+        roleList = r.map((e) {
+          if (e is String) return e;
+          if (e is Map)    return e['name']?.toString() ?? '';
+          return '';
+        }).where((e) => e.isNotEmpty).toList();
+      }
+    }
+
     return User(
-      id:               json['id'],
-      name:             json['name'] ?? '',
-      email:            json['email'] ?? '',
-      document:         int.tryParse(json['document']?.toString() ?? ''),
-      documentType:     json['tipo_documento'] != null
-          ? DocumentTypeExtension.fromString(json['tipo_documento'])
-          : null,
-      lastName:         json['last_name'] ?? json['apellido'],
-      birthDate:        json['birth_date'],
-      userType:         json['tipo_usuario'] ?? json['user_type'],
-      especialidad:     json['especialidad'],
-      token:            json['token'],
-      profilePhotoPath: json['profile_photo_path'],
-      photoUrl:         json['photo_url'],
-      phone:            json['phone'],
+      id:                  json['id'],
+      name:                json['name'] ?? '',
+      email:               json['email'] ?? '',
+      document:            int.tryParse(json['document']?.toString() ?? ''),
+      documentType:        json['tipo_documento'] != null
+                             ? DocumentTypeExtension.fromString(json['tipo_documento'])
+                             : null,
+      lastName:            json['last_name'] ?? json['apellido'],
+      birthDate:           json['birth_date'],
+      userType:            json['tipo_usuario'] ?? json['user_type'],
+      especialidad:        json['especialidad'],
+      token:               json['token'],
+      profilePhotoPath:    json['profile_photo_path'],
+      photoUrl:            json['photo_url'],
+      phone:               json['phone'],
+      genero:              json['genero'],
+      tipoSangre:          json['tipo_sangre'],
+      alergias:            json['alergias'],
+      notificacionesEmail: json['notificaciones_email'] == true || json['notificaciones_email'] == 1,
+      notificacionesSms:   json['notificaciones_sms'] == true || json['notificaciones_sms'] == 1,
+      isActive:            json['is_active'] != false && json['is_active'] != 0,
+      roles:               roleList,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id':             id,
-    'name':           name,
-    'email':          email,
-    'document':       document,
+    'id':            id,
+    'name':          name,
+    'email':         email,
+    'document':      document,
     'tipo_documento': documentType?.value,
-    'last_name':      lastName,
-    'birth_date':     birthDate,
-    'tipo_usuario':   userType,
-    'especialidad':   especialidad,
-    'phone':          phone,
+    'last_name':     lastName,
+    'birth_date':    birthDate,
+    'tipo_usuario':  userType,
+    'especialidad':  especialidad,
+    'phone':         phone,
+    'genero':        genero,
+    'tipo_sangre':   tipoSangre,
+    'alergias':      alergias,
+    'notificaciones_email': notificacionesEmail,
+    'notificaciones_sms':   notificacionesSms,
+    'is_active':     isActive,
   };
 
-  String get fullName  => '$name ${lastName ?? ''}'.trim();
-  bool   get isDoctor  => userType == 'medico';
-  bool   get isPatient => userType == 'paciente';
+  String get fullName => '$name ${lastName ?? ''}'.trim();
 
-  // ✅ FIX: hasPhoto verifica tanto photoUrl como profilePhotoPath
-  bool get hasPhoto =>
-      (photoUrl != null && photoUrl!.isNotEmpty) ||
-      (profilePhotoPath != null && profilePhotoPath!.isNotEmpty);
+  // Detectar rol desde lista Spatie o tipo_usuario legacy
+  bool get isAdmin   => roles.contains('admin')   || userType == 'admin';
+  bool get isDoctor  => roles.contains('medico')  || userType == 'medico';
+  bool get isPatient => roles.contains('paciente') || (!isAdmin && !isDoctor);
 
-  // ✅ FIX: fullPhotoUrl convierte cualquier URL a la ruta de la API con CORS
+  String get rolLabel {
+    if (isAdmin)  return 'Administrador';
+    if (isDoctor) return 'Médico';
+    return 'Paciente';
+  }
+
+  bool get hasPhoto => photoUrl != null && photoUrl!.isNotEmpty;
+
   String? get fullPhotoUrl {
-    // Si ya es URL de la API (/api/image/...) úsala directo
-    if (photoUrl != null && photoUrl!.contains('/api/image/')) {
-      return photoUrl;
-    }
-
-    // Si es URL completa de storage, extraer filename y convertir a API
-    if (photoUrl != null && photoUrl!.contains('/storage/')) {
-      final filename = photoUrl!.split('/').last.split('?').first;
-      return 'http://127.0.0.1:8000/api/image/profile_photos/$filename';
-    }
-
-    // Si photoUrl existe y empieza con http (URL directa de la API)
-    if (photoUrl != null && photoUrl!.startsWith('http')) {
-      return photoUrl;
-    }
-
-    // Si solo tenemos profilePhotoPath (ruta interna del servidor)
-    if (profilePhotoPath != null && profilePhotoPath!.isNotEmpty) {
-      final filename = profilePhotoPath!.split('/').last;
-      return 'http://127.0.0.1:8000/api/image/profile_photos/$filename';
-    }
-
-    return null;
+    if (photoUrl == null) return null;
+    if (photoUrl!.startsWith('http')) return photoUrl;
+    return 'http://127.0.0.1:8000$photoUrl';
   }
 }

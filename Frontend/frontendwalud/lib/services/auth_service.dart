@@ -7,7 +7,8 @@ import '../config/api_config.dart';
 class AuthService {
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final response = await ApiService.post(ApiConfig.loginEndpoint, {'email': email, 'password': password});
+      final response = await ApiService.post(
+          ApiConfig.loginEndpoint, {'email': email, 'password': password});
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['token'] != null) {
@@ -24,16 +25,20 @@ class AuthService {
   }
 
   static Future<Map<String, dynamic>> register({
-    required String       document,
+    required String document,
     required DocumentType documentType,
-    required String       name,
-    required String       lastName,
-    required String       email,
-    required String       password,
-    required String       passwordConfirmation,
-    required String       birthDate,
-    required String       userType,
-    String?               especialidad,
+    required String name,
+    required String lastName,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+    required String birthDate,
+    required String phone,
+    required String genero,
+    String? tipoSangre,
+    String? alergias,
+    bool notificacionesEmail = true,
+    bool notificacionesSms   = false,
   }) async {
     try {
       final body = {
@@ -45,24 +50,35 @@ class AuthService {
         'password':              password,
         'password_confirmation': passwordConfirmation,
         'birth_date':            birthDate,
-        'tipo_usuario':          userType,
-        if (especialidad != null && especialidad.isNotEmpty) 'especialidad': especialidad,
+        'phone':                 phone,
+        'genero':                genero,
+        if (tipoSangre != null && tipoSangre.isNotEmpty) 'tipo_sangre': tipoSangre,
+        if (alergias != null && alergias.isNotEmpty)     'alergias':    alergias,
+        'notificaciones_email':  notificacionesEmail,
+        'notificaciones_sms':    notificacionesSms,
       };
-
       final response = await ApiService.post(ApiConfig.registerEndpoint, body);
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'message': data['message'] ?? 'Registro exitoso', 'user': User.fromJson(data['user'])};
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Registro exitoso',
+          'user':    User.fromJson(data['user']),
+        };
       }
       final error = jsonDecode(response.body);
-      return {'success': false, 'message': error['message'] ?? 'Error al registrar', 'errors': error['errors']};
+      return {
+        'success': false,
+        'message': error['message'] ?? 'Error al registrar',
+        'errors':  error['errors'],
+      };
     } catch (e) {
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
 
   static Future<void> _saveUserData(Map<String, dynamic> userData) async =>
-    (await SharedPreferences.getInstance()).setString('user_data', jsonEncode(userData));
+      (await SharedPreferences.getInstance()).setString('user_data', jsonEncode(userData));
 
   static Future<User?> getSavedUser() async {
     try {

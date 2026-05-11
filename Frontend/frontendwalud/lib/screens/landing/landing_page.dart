@@ -101,7 +101,13 @@ class LandingPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(25),
                   ),
                 ),
-                child: const Text('Registrarse'),
+                child: const Text(
+                  'Registrarse',
+                  style: TextStyle(
+                    color: const Color(0xFFFFFFFF),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
@@ -201,9 +207,15 @@ class LandingPage extends StatelessWidget {
                       ),
                       child: const Row(
                         children: [
-                          Text('Registrarse', style: TextStyle(fontSize: 16)),
+                          Text(
+                            'Registrarse',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFFFFFFFF),
+                            ),
+                          ),
                           SizedBox(width: 8),
-                          Icon(Icons.arrow_forward),
+                          Icon(Icons.arrow_forward, color: Color(0xFFFFFFFF)),
                         ],
                       ),
                     ),
@@ -369,7 +381,7 @@ class LandingPage extends StatelessWidget {
   // SECCIÓN DE CARACTERÍSTICAS
   Widget _buildFeaturesSection() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 80),
+      padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 80),
       child: Row(
         children: [
           // Logo
@@ -377,42 +389,21 @@ class LandingPage extends StatelessWidget {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(40),
+                  width: 350,
+                  height: 350,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF06B6D4), Color(0xFF4F46E5)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                     borderRadius: BorderRadius.circular(32),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF06B6D4).withOpacity(0.3),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.add, size: 80, color: Colors.white),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'WALUD',
-                        style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/LOGOWALUD.png'),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(width: 80),
+          const SizedBox(width: 100),
 
           // Contenido a la derecha
           Expanded(
