@@ -9,6 +9,7 @@ import '../auth/login_screen.dart';
 import '../appointments/appointments_list_screen.dart';
 import '../appointments/create_appointment_screen.dart';
 import '../profile/profile_screen.dart';
+import '../../widgets/ai_floating_widget.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -85,14 +86,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      body: Row(
+  backgroundColor: const Color(0xFFF0F4F8),
+
+  body: Stack(
+    children: [
+
+      Row(
         children: [
           _buildSidebar(),
-          Expanded(child: _buildScreen(_selectedIndex)),
+          Expanded(
+            child: _buildScreen(_selectedIndex),
+          ),
         ],
       ),
-    );
+
+      const AIFloatingWidget(),
+
+    ],
+  ),
+);
   }
 
   Widget _buildSidebar() {

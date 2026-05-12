@@ -6,6 +6,7 @@ use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AIController;
 
 // ── Públicas
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -40,6 +41,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payments/{id}/pay',  [PaymentController::class, 'pay']);
     Route::apiResource('payments', PaymentController::class);
 
+      // ── RUTAS IA
+    Route::post('/ia/preconsulta', [AIController::class, 'preconsulta']);
+
+
     // ── RUTAS ADMIN
     Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
 
@@ -57,3 +62,4 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/payments/stats',            [AdminController::class, 'paymentStats']);
     });
 });
+
