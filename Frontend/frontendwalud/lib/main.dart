@@ -33,7 +33,8 @@ class WaludApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Cambiar a LandingPage como página inicial
-      home: const LandingPage(),
+      // 
+        home: const AuthWrapper(),
       // O mantener AuthWrapper si quieres verificar sesión:
       // home: const AuthWrapper(),
     );

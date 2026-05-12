@@ -58,4 +58,21 @@ class User extends Authenticatable
         if ($this->hasRole('medico'))  return 'medico';
         return 'paciente';
     }
+
+    // Agrega estos métodos al modelo User existente
+
+public function patientProfile()
+{
+    return $this->hasOne(PatientProfile::class);
+}
+
+public function doctorProfile()
+{
+    return $this->hasOne(DoctorProfile::class);
+}
+
+public function patientDocuments()
+{
+    return $this->hasMany(PatientDocument::class);
+}
 }

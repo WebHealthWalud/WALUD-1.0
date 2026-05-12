@@ -1,4 +1,3 @@
-// lib/screens/dashboard/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/appointment.dart';
@@ -8,7 +7,9 @@ import '../../services/appointment_service.dart';
 import '../auth/login_screen.dart';
 import '../appointments/appointments_list_screen.dart';
 import '../appointments/create_appointment_screen.dart';
-import '../profile/profile_screen.dart';
+import '../profile/patient_profile_screen.dart';
+import '../profile/doctor_profile_screen.dart';
+import '../payments/payments_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -29,69 +30,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadUser() async {
     final r = await AuthService.getCurrentUser();
-    if (mounted) setState(() { _isLoading = false; _currentUser = r['success'] ? r['user'] : null; });
+    if (mounted) setState(() {
+      _isLoading   = false;
+      _currentUser = r['success'] ? r['user'] : null;
+    });
   }
 
   Future<void> _handleLogout() async {
     await AuthService.logout();
-    if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    if (mounted) Navigator.pushReplacement(
+      context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
-  // ✅ FIX 1: _navItems como método para evitar problemas con índices dinámicos
   List<_NavItem> get _navItems {
-    final items = <_NavItem>[
-      _NavItem(icon: Icons.grid_view_rounded,      label: 'Inicio'),
-      _NavItem(icon: Icons.calendar_today_outlined, label: 'Citas'),
-      _NavItem(icon: Icons.history_outlined,        label: 'Historial'),
-    ];
-    if (_currentUser?.isPatient == true) {
-      items.add(_NavItem(icon: Icons.headset_mic_outlined, label: 'Soporte'));
-    }
-    // Perfil siempre es el último
-    items.add(_NavItem(icon: Icons.person_outline, label: 'Perfil'));
-    return items;
+  final items = <_NavItem>[
+    _NavItem(icon: Icons.grid_view_rounded,       label: 'Inicio'),
+    _NavItem(icon: Icons.calendar_today_outlined,  label: 'Citas'),
+    _NavItem(icon: Icons.history_outlined,         label: 'Historial'),
+  ];
+  if (_currentUser?.isPatient == true) {
+    items.add(_NavItem(icon: Icons.payment_outlined, label: 'Pagos'));
+    items.add(_NavItem(icon: Icons.headset_mic_outlined, label: 'Soporte'));
   }
+  items.add(_NavItem(icon: Icons.person_outline, label: 'Perfil'));
+  return items;
+}
 
-  // ✅ FIX 2: índice de perfil calculado dinámicamente
-  int get _perfilIndex => _navItems.length - 1;
-  int get _soporteIndex => _currentUser?.isPatient == true ? 3 : -1;
+  int get _perfilIndex  => _navItems.length - 1;
+  int get _pagosIndex   => _currentUser?.isPatient == true ? 3 : -1;
+  int get _soporteIndex => _currentUser?.isPatient == true ? 4 : -1;
 
   Widget _buildScreen(int idx) {
-    if (idx == 0) {
-      return _HomeTab(
-        user: _currentUser,
-        onNavigate: (i) => setState(() => _selectedIndex = i),
-      );
-    }
-    if (idx == 1) return const AppointmentsListScreen();
-    if (idx == 2) return _HistorialTab();
-    if (idx == _soporteIndex) return _SoporteTab();
-    if (idx == _perfilIndex) {
-      return ProfileScreen(
-        onProfileUpdated: () async {
-          // ✅ FIX 3: recargar usuario y actualizar foto en sidebar
-          await _loadUser();
-          setState(() {});
-        },
-      );
-    }
-    return const SizedBox();
+  if (idx == 0) {
+    return _HomeTab(
+      user:       _currentUser,
+      onNavigate: (i) => setState(() => _selectedIndex = i),
+    );
   }
+  if (idx == 1) return const AppointmentsListScreen();
+  if (idx == 2) return _HistorialTab();
+  if (idx == _pagosIndex)   return const PaymentsScreen();
+  if (idx == _soporteIndex) return _SoporteTab();
+  if (idx == _perfilIndex)  {
+    if (_currentUser?.isDoctor == true) {
+      return const DoctorProfileScreen();
+    } else {
+      return const PatientProfileScreen();
+    }
+  }
+  return const SizedBox();
+}
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5))));
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5))));
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(child: _buildScreen(_selectedIndex)),
-        ],
-      ),
+      body: Row(children: [
+        _buildSidebar(),
+        Expanded(child: _buildScreen(_selectedIndex)),
+      ]),
     );
   }
 
@@ -124,7 +126,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Padding(
                 padding: const EdgeInsets.only(left: 34),
                 child: Text('SALUD DIGITAL', style: TextStyle(
-                  fontSize: 9, letterSpacing: 1.5, color: Colors.grey[400], fontWeight: FontWeight.w600,
+                  fontSize: 9, letterSpacing: 1.5,
+                  color: Colors.grey[400], fontWeight: FontWeight.w600,
                 )),
               ),
             ]),
@@ -198,62 +201,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           Divider(height: 1, color: Colors.grey.shade100),
 
-          // ✅ FIX 4: Mini perfil — onTap usa _perfilIndex dinámico
+          // Mini perfil sidebar
           InkWell(
             onTap: () => setState(() => _selectedIndex = _perfilIndex),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(children: [
-                // ✅ FIX 5: Avatar con key para forzar recarga al cambiar foto
                 Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: _currentUser?.hasPhoto != true
-                        ? const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)])
+                        ? const LinearGradient(
+                            colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)])
                         : null,
-                    border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.3), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFF4F46E5).withOpacity(0.3), width: 2),
                   ),
                   child: _currentUser?.hasPhoto == true
-                      ? ClipOval(
-                          child: Image.network(
-                            // ✅ timestamp para evitar caché del navegador
-                            '${_currentUser!.fullPhotoUrl!}?t=${DateTime.now().millisecondsSinceEpoch}',
-                            key: ValueKey(_currentUser!.fullPhotoUrl),
-                            fit: BoxFit.cover,
-                            width: 36,
-                            height: 36,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Text(
-                                _currentUser?.name.isNotEmpty == true
-                                    ? _currentUser!.name[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : Center(
-                          child: Text(
+                      ? ClipOval(child: Image.network(
+                          '${_currentUser!.fullPhotoUrl!}?t=${DateTime.now().millisecondsSinceEpoch}',
+                          key: ValueKey(_currentUser!.fullPhotoUrl),
+                          fit: BoxFit.cover,
+                          width: 36, height: 36,
+                          errorBuilder: (_, __, ___) => Center(child: Text(
                             _currentUser?.name.isNotEmpty == true
-                                ? _currentUser!.name[0].toUpperCase()
-                                : '?',
+                                ? _currentUser!.name[0].toUpperCase() : '?',
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
+                              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          )),
+                        ))
+                      : Center(child: Text(
+                          _currentUser?.name.isNotEmpty == true
+                              ? _currentUser!.name[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        )),
                 ),
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(_currentUser?.fullName ?? 'Usuario',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A)),
+                    style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A)),
                     overflow: TextOverflow.ellipsis),
                   Text(_currentUser?.isDoctor == true ? 'Médico' : 'Paciente',
                     style: TextStyle(fontSize: 10, color: Colors.grey[400])),
@@ -264,7 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
 
           Divider(height: 1, color: Colors.grey.shade100),
-          _sidebarFooterItem(Icons.help_outline, 'Ayuda', () {}),
+          _sidebarFooterItem(Icons.help_outline,  'Ayuda', () {}),
           _sidebarFooterItem(Icons.logout, 'Cerrar Sesión', _handleLogout, isRed: true),
           const SizedBox(height: 12),
         ],
@@ -272,7 +261,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _sidebarFooterItem(IconData icon, String label, VoidCallback onTap, {bool isRed = false}) {
+  Widget _sidebarFooterItem(IconData icon, String label, VoidCallback onTap,
+      {bool isRed = false}) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -292,13 +282,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _NavItem {
   final IconData icon;
-  final String label;
+  final String   label;
   const _NavItem({required this.icon, required this.label});
 }
 
 // ── HOME TAB
 class _HomeTab extends StatefulWidget {
-  final User? user;
+  final User?       user;
   final Function(int) onNavigate;
   const _HomeTab({this.user, required this.onNavigate});
 
@@ -318,8 +308,8 @@ class _HomeTabState extends State<_HomeTab> {
   Future<void> _loadNext() async {
     final r = await AppointmentService.getAll(status: 'pendiente');
     if (r['success'] == true && mounted) {
-      final list = List<Appointment>.from(r['appointments']);
-      final now  = DateTime.now();
+      final list     = List<Appointment>.from(r['appointments']);
+      final now      = DateTime.now();
       final upcoming = list.where((a) => a.dateTime.isAfter(now)).toList()
         ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
       setState(() => _nextAppointment = upcoming.isNotEmpty ? upcoming.first : null);
@@ -333,10 +323,9 @@ class _HomeTabState extends State<_HomeTab> {
       padding: const EdgeInsets.all(32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(
-            child: Text('Hola, ${user?.name ?? 'Usuario'}',
-              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A))),
-          ),
+          Expanded(child: Text('Hola, ${user?.name ?? 'Usuario'}',
+            style: const TextStyle(
+              fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A)))),
           if (_nextAppointment != null)
             _NextAppointmentCard(appointment: _nextAppointment!),
         ]),
@@ -394,7 +383,9 @@ class _NextAppointmentCard extends StatelessWidget {
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))],
+        boxShadow: [BoxShadow(
+          color: const Color(0xFF4F46E5).withOpacity(0.3),
+          blurRadius: 20, offset: const Offset(0, 8))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -404,14 +395,15 @@ class _NextAppointmentCard extends StatelessWidget {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text('PRÓXIMA CITA', style: TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.bold)),
+            child: const Text('PRÓXIMA CITA', style: TextStyle(
+              color: Colors.white, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.bold)),
           ),
           const Spacer(),
           const Icon(Icons.calendar_today, color: Colors.white54, size: 16),
         ]),
         const SizedBox(height: 14),
-        Text(appointment.doctorName,
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(appointment.doctorName, style: const TextStyle(
+          color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text('${appointment.especialidad} • Clínica Walud',
           style: const TextStyle(color: Colors.white60, fontSize: 12)),
@@ -424,15 +416,19 @@ class _NextAppointmentCard extends StatelessWidget {
           ),
           child: Row(children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('FECHA', style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+              const Text('FECHA', style: TextStyle(
+                color: Colors.white38, fontSize: 9, letterSpacing: 1)),
               Text(DateFormat('d MMM', 'es').format(appointment.dateTime),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             const SizedBox(width: 24),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('HORA', style: TextStyle(color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+              const Text('HORA', style: TextStyle(
+                color: Colors.white38, fontSize: 9, letterSpacing: 1)),
               Text(DateFormat('hh:mm a').format(appointment.dateTime),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
           ]),
         ),
@@ -443,13 +439,14 @@ class _NextAppointmentCard extends StatelessWidget {
 
 class _QuickCard extends StatelessWidget {
   final IconData icon;
-  final Color iconColor, iconBg;
-  final String title, subtitle, actionLabel;
+  final Color    iconColor, iconBg;
+  final String   title, subtitle, actionLabel;
   final VoidCallback onTap;
 
   const _QuickCard({
-    required this.icon, required this.iconColor, required this.iconBg,
-    required this.title, required this.subtitle, required this.actionLabel,
+    required this.icon,       required this.iconColor,
+    required this.iconBg,     required this.title,
+    required this.subtitle,   required this.actionLabel,
     required this.onTap,
   });
 
@@ -460,7 +457,9 @@ class _QuickCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
@@ -469,7 +468,8 @@ class _QuickCard extends StatelessWidget {
           child: Icon(icon, color: iconColor, size: 24),
         ),
         const SizedBox(height: 20),
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
+        Text(title, style: const TextStyle(
+          fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
         const SizedBox(height: 8),
         Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 13, height: 1.5)),
         const SizedBox(height: 20),
@@ -477,8 +477,7 @@ class _QuickCard extends StatelessWidget {
           onTap: onTap,
           child: Row(children: [
             Text(actionLabel, style: const TextStyle(
-              color: Color(0xFF1A1A7A), fontWeight: FontWeight.bold, fontSize: 14,
-            )),
+              color: Color(0xFF1A1A7A), fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(width: 6),
             const Icon(Icons.arrow_forward, size: 16, color: Color(0xFF1A1A7A)),
           ]),
@@ -494,7 +493,8 @@ class _HistorialTab extends StatelessWidget {
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Icon(Icons.history, size: 80, color: Color(0xFF4F46E5)),
       SizedBox(height: 16),
-      Text('Historial Médico', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
+      Text('Historial Médico', style: TextStyle(
+        fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
       SizedBox(height: 8),
       Text('Próximamente disponible', style: TextStyle(color: Colors.grey)),
     ]),
@@ -507,7 +507,8 @@ class _SoporteTab extends StatelessWidget {
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Icon(Icons.headset_mic, size: 80, color: Color(0xFF4F46E5)),
       SizedBox(height: 16),
-      Text('Soporte', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
+      Text('Soporte', style: TextStyle(
+        fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
       SizedBox(height: 8),
       Text('Próximamente disponible', style: TextStyle(color: Colors.grey)),
     ]),

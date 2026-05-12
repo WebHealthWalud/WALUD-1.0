@@ -25,33 +25,40 @@ class UserController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $request->validate([
-            'name'         => 'required',
-            'document'     => 'required|unique:users',
-            'last_name'    => 'required',
-            'email'        => 'required|email|unique:users',
-            'password'     => 'required|min:6',
-            'tipo_usuario' => 'required|in:paciente,medico',
-            'birth_date'   => 'nullable|date',
-            'especialidad' => 'nullable|string',
-        ]);
+{
+    $request->validate([
+        'name'         => 'required',
+        'document'     => 'required|unique:users',
+        'last_name'    => 'required',
+        'email'        => 'required|email|unique:users',
+        'password'     => 'required|min:6',
+        'tipo_usuario' => 'required|in:paciente,medico',
+        'birth_date'   => 'nullable|date',
+        'especialidad' => 'nullable|string',
+    ]);
 
-        $user = User::create([
-            'document'     => $request->document,
-            'name'         => $request->name,
-            'last_name'    => $request->last_name,
-            'email'        => $request->email,
-            'password'     => Hash::make($request->password),
-            'tipo_usuario' => $request->tipo_usuario,
-            'birth_date'   => $request->birth_date,
-            'especialidad' => $request->especialidad,
-        ]);
+    $user = User::create([
+        'document'     => $request->document,
+        'name'         => $request->name,
+        'last_name'    => $request->last_name,
+        'email'        => $request->email,
+        'password'     => Hash::make($request->password),
+        'tipo_usuario' => $request->tipo_usuario,
+        'birth_date'   => $request->birth_date,
+        'especialidad' => $request->especialidad,
+    ]);
 
-        $user->assignRole($request->tipo_usuario);
+    $user->assignRole($request->tipo_usuario);
 
-        return response()->json($user, 201);
+    // ✅ Crear perfil vacío automáticamente según rol
+    if ($request->tipo_usuario === 'paciente') {
+        \App\Models\PatientProfile::create(['user_id' => $user->id]);
+    } elseif ($request->tipo_usuario === 'medico') {
+        \App\Models\DoctorProfile::create(['user_id' => $user->id]);
     }
+
+    return response()->json($user, 201);
+}
 
     public function show($id)
     {
