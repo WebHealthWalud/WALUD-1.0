@@ -27,7 +27,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   bool _isUploadingPhoto  = false;
   bool _showCompleteForm  = false;
 
-  // Controladores para completar perfil
+  // Controladores perfil
   final _pesoCtrl             = TextEditingController();
   final _tallaCtrl            = TextEditingController();
   final _direccionCtrl        = TextEditingController();
@@ -36,10 +36,31 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   final _contactoTelefonoCtrl = TextEditingController();
   final _contactoRelacionCtrl = TextEditingController();
 
+  // ✅ Seguridad
+  bool _isChangingPass   = false;
+  bool _showSecurityForm = false;
+  bool _obscureCurrent   = true;
+  bool _obscureNew       = true;
+  bool _obscureConfirm   = true;
+  final _currentPassCtrl = TextEditingController();
+  final _newPassCtrl     = TextEditingController();
+  final _confirmPassCtrl = TextEditingController();
+
+  bool get _hasLength  => _newPassCtrl.text.length >= 8;
+  bool get _hasUpper   => _newPassCtrl.text.contains(RegExp(r'[A-Z]'));
+  bool get _hasLower   => _newPassCtrl.text.contains(RegExp(r'[a-z]'));
+  bool get _hasNumber  => _newPassCtrl.text.contains(RegExp(r'[0-9]'));
+  bool get _hasSpecial => _newPassCtrl.text.contains(
+      RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-]'));
+  int get _strength => [
+    _hasLength, _hasUpper, _hasLower, _hasNumber, _hasSpecial
+  ].where((b) => b).length;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _newPassCtrl.addListener(() => setState(() {}));
   }
 
   Future<void> _loadData() async {
@@ -75,7 +96,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
   }
 
-  // ── Calcular edad
   int _calcularEdad(String? birthDate) {
     if (birthDate == null) return 0;
     final birth = DateTime.tryParse(birthDate);
@@ -87,7 +107,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     return age;
   }
 
-  // ── Subir foto de perfil
   Future<void> _pickAndUploadPhoto() async {
     final result = await FilePicker.pickFiles(
       type: FileType.image,
@@ -109,13 +128,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
 
     setState(() => _isUploadingPhoto = true);
-
     final r = await ProfileService.uploadPhoto(
       fileName:  file.name,
       filePath:  filePath,
       fileBytes: fileBytes,
     );
-
     setState(() => _isUploadingPhoto = false);
 
     if (mounted) {
@@ -155,6 +172,50 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('✅ Perfil actualizado correctamente'),
+          backgroundColor: Color(0xFF10B981),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(r['message'] ?? 'Error'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  // ✅ Cambiar contraseña
+  Future<void> _changePassword() async {
+    if (_newPassCtrl.text != _confirmPassCtrl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Las contraseñas no coinciden'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    if (_strength < 5) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('La contraseña no cumple los requisitos de seguridad'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    setState(() => _isChangingPass = true);
+    final r = await ProfileService.changePassword(
+      currentPassword: _currentPassCtrl.text,
+      newPassword:     _newPassCtrl.text,
+      confirmation:    _confirmPassCtrl.text,
+    );
+    setState(() => _isChangingPass = false);
+
+    if (mounted) {
+      if (r['success'] == true) {
+        _currentPassCtrl.clear();
+        _newPassCtrl.clear();
+        _confirmPassCtrl.clear();
+        setState(() => _showSecurityForm = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✅ Contraseña actualizada correctamente'),
           backgroundColor: Color(0xFF10B981),
         ));
       } else {
@@ -297,39 +358,33 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Banner perfil incompleto
         if (_profile?.isComplete == false) _buildIncompleteBanner(),
-
-        // Header azul
         _buildHeader(),
         const SizedBox(height: 24),
-
-        // Formulario completar perfil
         if (_showCompleteForm) ...[
           _buildCompleteProfileForm(),
           const SizedBox(height: 24),
         ],
-
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Columna izquierda
           Expanded(child: Column(children: [
             _buildFichaMedica(),
             const SizedBox(height: 20),
             _buildContactoEmergencia(),
           ])),
           const SizedBox(width: 20),
-          // Columna derecha
           Expanded(child: Column(children: [
             _buildHistorialCitas(),
             const SizedBox(height: 20),
             _buildDocumentosMedicos(),
           ])),
         ]),
+        // ✅ Sección seguridad
+        const SizedBox(height: 20),
+        _buildSecurityCard(),
       ]),
     );
   }
 
-  // ── Banner perfil incompleto
   Widget _buildIncompleteBanner() {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -345,8 +400,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Perfil incompleto', style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF92400E), fontSize: 14,
+            fontWeight: FontWeight.bold, color: Color(0xFF92400E), fontSize: 14,
           )),
           const SizedBox(height: 2),
           const Text(
@@ -363,7 +417,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Header azul con foto y botón cámara
   Widget _buildHeader() {
     final edad = _calcularEdad(_user?.birthDate);
     return Container(
@@ -376,7 +429,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(children: [
-        // ✅ Foto con botón cámara
         Stack(children: [
           Container(
             width: 80, height: 80,
@@ -398,7 +450,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                   ))
                 : _avatarFallback(),
           ),
-          // ✅ Botón cámara
           Positioned(
             bottom: 0, right: 0,
             child: GestureDetector(
@@ -414,7 +465,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                     ? const Padding(
                         padding: EdgeInsets.all(4),
                         child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
+                            color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.camera_alt,
                         color: Colors.white, size: 14),
               ),
@@ -422,7 +473,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           ),
         ]),
         const SizedBox(width: 20),
-        // Info
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_user?.fullName ?? '', style: const TextStyle(
             color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold,
@@ -451,7 +501,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               style: const TextStyle(color: Colors.white70, fontSize: 13)),
           ]),
         ])),
-        // Botón editar
         ElevatedButton.icon(
           onPressed: () =>
               setState(() => _showCompleteForm = !_showCompleteForm),
@@ -468,7 +517,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Formulario completar perfil
   Widget _buildCompleteProfileForm() {
     return _card(
       title: 'Completar Perfil',
@@ -550,7 +598,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Ficha médica
   Widget _buildFichaMedica() {
     return _card(
       title: 'Ficha Médica',
@@ -635,7 +682,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Contacto de emergencia
   Widget _buildContactoEmergencia() {
     final tieneContacto = _profile?.contactoEmergenciaNombre != null;
     return _card(
@@ -698,7 +744,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             )
           : Center(child: Column(children: [
               const SizedBox(height: 8),
-              Icon(Icons.emergency_outlined, size: 40, color: Colors.grey[300]),
+              Icon(Icons.emergency_outlined,
+                  size: 40, color: Colors.grey[300]),
               const SizedBox(height: 8),
               Text('Sin contacto de emergencia',
                   style: TextStyle(color: Colors.grey[400])),
@@ -711,7 +758,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Historial de citas
   Widget _buildHistorialCitas() {
     return _card(
       title: 'Historial de Citas',
@@ -731,7 +777,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Documentos médicos
   Widget _buildDocumentosMedicos() {
     return _card(
       title: 'Documentos Médicos',
@@ -748,13 +793,15 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           backgroundColor: const Color(0xFF4F46E5),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
         ),
       ),
       child: _documents.isEmpty
           ? Center(child: Column(children: [
               const SizedBox(height: 16),
-              Icon(Icons.folder_open_outlined, size: 48, color: Colors.grey[300]),
+              Icon(Icons.folder_open_outlined,
+                  size: 48, color: Colors.grey[300]),
               const SizedBox(height: 8),
               Text('Sin documentos médicos',
                   style: TextStyle(color: Colors.grey[400])),
@@ -820,7 +867,197 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  // ── Helpers UI
+  // ✅ Seguridad
+  Widget _buildSecurityCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 10, offset: const Offset(0, 4),
+        )],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.lock_outline,
+              color: Color(0xFF1A1A7A), size: 20),
+          const SizedBox(width: 8),
+          const Text('Seguridad', style: TextStyle(
+            fontSize: 15, fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A7A),
+          )),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: () => setState(
+                () => _showSecurityForm = !_showSecurityForm),
+            icon: Icon(
+              _showSecurityForm
+                  ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+            ),
+            label: Text(
+                _showSecurityForm ? 'Cerrar' : 'Cambiar contraseña'),
+            style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5)),
+          ),
+        ]),
+        if (_showSecurityForm) ...[
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          _passField('Contraseña actual', _currentPassCtrl,
+              _obscureCurrent,
+              () => setState(
+                  () => _obscureCurrent = !_obscureCurrent)),
+          const SizedBox(height: 16),
+          _passField('Nueva contraseña', _newPassCtrl,
+              _obscureNew,
+              () => setState(() => _obscureNew = !_obscureNew)),
+          if (_newPassCtrl.text.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildStrengthIndicator(),
+          ],
+          const SizedBox(height: 16),
+          _passField('Confirmar nueva contraseña', _confirmPassCtrl,
+              _obscureConfirm,
+              () => setState(
+                  () => _obscureConfirm = !_obscureConfirm)),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isChangingPass ? null : _changePassword,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A237E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isChangingPass
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Text('Cambiar Contraseña',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _passField(String label, TextEditingController ctrl,
+      bool obscure, VoidCallback toggle) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(
+        fontSize: 12, fontWeight: FontWeight.w600,
+        color: Color(0xFF374151),
+      )),
+      const SizedBox(height: 6),
+      TextFormField(
+        controller: ctrl,
+        obscureText: obscure,
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.lock_outline,
+              size: 18, color: Colors.grey[400]),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: Colors.grey, size: 18,
+            ),
+            onPressed: toggle,
+          ),
+          filled: true,
+          fillColor: const Color(0xFFF9FAFB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+                color: Color(0xFF4F46E5), width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 12),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildStrengthIndicator() {
+    final color = _strength <= 2
+        ? Colors.red
+        : _strength <= 3
+            ? Colors.orange
+            : _strength <= 4
+                ? Colors.yellow.shade700
+                : Colors.green;
+    final label = _strength <= 2
+        ? 'Débil'
+        : _strength <= 3
+            ? 'Regular'
+            : _strength <= 4
+                ? 'Buena'
+                : 'Fuerte';
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: _strength / 5,
+            backgroundColor: Colors.grey.shade200,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 5,
+          ),
+        )),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(
+          color: color, fontSize: 12, fontWeight: FontWeight.bold,
+        )),
+      ]),
+      const SizedBox(height: 8),
+      Wrap(spacing: 6, runSpacing: 4, children: [
+        _reqBadge('8+ chars', _hasLength),
+        _reqBadge('Mayúscula', _hasUpper),
+        _reqBadge('Minúscula', _hasLower),
+        _reqBadge('Número',    _hasNumber),
+        _reqBadge('Especial',  _hasSpecial),
+      ]),
+    ]);
+  }
+
+  Widget _reqBadge(String label, bool met) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: met ? Colors.green.withOpacity(0.1) : Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+          color: met ? Colors.green.shade300 : Colors.grey.shade300),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(met ? Icons.check : Icons.close,
+          size: 11, color: met ? Colors.green : Colors.grey),
+      const SizedBox(width: 3),
+      Text(label, style: TextStyle(
+        fontSize: 10,
+        color: met ? Colors.green : Colors.grey,
+        fontWeight: FontWeight.w500,
+      )),
+    ]),
+  );
+
   Widget _card({
     required String   title,
     required IconData icon,
@@ -843,7 +1080,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           Icon(icon, color: const Color(0xFF1A1A7A), size: 20),
           const SizedBox(width: 8),
           Text(title, style: const TextStyle(
-            fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A),
+            fontSize: 15, fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A7A),
           )),
           if (trailing != null) ...[const Spacer(), trailing],
         ]),
@@ -907,6 +1145,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     _contactoNombreCtrl.dispose();
     _contactoTelefonoCtrl.dispose();
     _contactoRelacionCtrl.dispose();
+    _currentPassCtrl.dispose();
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
     super.dispose();
   }
 }

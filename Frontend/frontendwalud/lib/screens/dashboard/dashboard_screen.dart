@@ -10,6 +10,8 @@ import '../appointments/create_appointment_screen.dart';
 import '../profile/patient_profile_screen.dart';
 import '../profile/doctor_profile_screen.dart';
 import '../payments/payments_screen.dart';
+import '../../widgets/ai_floating_widget.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -89,11 +91,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      body: Row(children: [
-        _buildSidebar(),
-        Expanded(child: _buildScreen(_selectedIndex)),
-      ]),
+backgroundColor: const Color(0xFFF0F4F8),
+
+      body: Stack(
+        children: [
+
+          Row(
+            children: [
+              _buildSidebar(),
+              Expanded(
+                child: _buildScreen(_selectedIndex),
+              ),
+            ],
+          ),
+
+          const AIFloatingWidget(),
+
+        ],
+      ),
     );
   }
 

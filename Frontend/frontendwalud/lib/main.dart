@@ -41,7 +41,6 @@ class WaludApp extends StatelessWidget {
   }
 }
 
-// NUEVO: Widget que decide si mostrar Login o Dashboard
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -57,21 +56,62 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkAuth() async {
-    // Pequeño delay para mostrar splash si se desea
     await Future.delayed(const Duration(milliseconds: 300));
 
     final hasSession = await AuthService.hasValidSession();
 
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              hasSession ? const DashboardScreen() : const LoginScreen(),
-        ),
-      );
+      if (hasSession) {
+        // ✅ Si hay sesión activa → Dashboard directo
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        );
+      } else {
+        // ✅ Si no hay sesión → LandingPage
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LandingPage()),
+        );
+      }
     }
   }
+
+  @override
+  Widget build(BuildContext context) {
+    // ✅ Splash mientras verifica
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1A1A7A), Color(0xFF4F46E5)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add, size: 60, color: Colors.white),
+              SizedBox(height: 16),
+              Text('WALUD', style: TextStyle(
+                fontSize: 32, fontWeight: FontWeight.bold,
+                color: Colors.white, letterSpacing: 2,
+              )),
+              SizedBox(height: 8),
+              Text('SALUD DIGITAL', style: TextStyle(
+                fontSize: 12, color: Colors.white70, letterSpacing: 3,
+              )),
+              SizedBox(height: 40),
+              CircularProgressIndicator(color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -107,4 +147,4 @@ class _AuthWrapperState extends State<AuthWrapper> {
       ),
     );
   }
-}
+
