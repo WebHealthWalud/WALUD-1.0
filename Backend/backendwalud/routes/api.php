@@ -10,12 +10,13 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PatientProfileController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\MedicalRecordController;
 
 // ── Públicas
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
-// ✅ Ruta separada para profile_photos
+// Ruta separada para profile_photos
 Route::get('/image/profile_photos/{filename}', function ($filename) {
 
     $path = storage_path("app/public/profile_photos/{$filename}");
@@ -37,7 +38,7 @@ Route::get('/image/profile_photos/{filename}', function ($filename) {
 })->where('filename', '[a-zA-Z0-9_.]+');
 
 
-// ✅ Ruta para documentos de pacientes
+// Ruta para documentos de pacientes
 Route::get('/image/patient_documents/{userId}/{filename}', function ($userId, $filename) {
 
     $path = storage_path("app/public/patient_documents/{$userId}/{$filename}");
@@ -104,6 +105,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── IA
     Route::post('/ia/preconsulta', [AIController::class, 'preconsulta']);
+
+    // ── Historial Médico
+    Route::get('/medical-records/search-patient', [MedicalRecordController::class, 'searchPatient']);
+    Route::get('/medical-records/timeline/{patientId}', [MedicalRecordController::class, 'timeline']);
+    Route::apiResource('medical-records', MedicalRecordController::class);
 
     // ── Admin
     Route::prefix('admin')->group(function () {
