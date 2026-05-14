@@ -36,19 +36,47 @@ class PaymentService {
     }
   }
 
-  static Future<Map<String, dynamic>> create(Payment payment) async {
-    try {
-      final response = await ApiService.postAuth(_endpoint, payment.toJson());
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        return {'success': true, 'message': data['message'], 'payment': Payment.fromJson(data['data'])};
-      }
-      final error = jsonDecode(response.body);
-      return {'success': false, 'message': error['message'] ?? 'Error al crear pago'};
-    } catch (e) {
-      return {'success': false, 'message': 'Error de conexión: $e'};
+  static Future<Map<String, dynamic>> create({
+  required String concepto,
+  required String tipo,
+  required double monto,
+  String?  estadoPago,
+  String?  fechaPago,
+  String?  metodoPago,
+  String?  referenciaPago,
+  int?     appointmentId,
+  String?  fechaVencimiento,
+  String?  notas,
+}) async {
+  try {
+    final body = <String, dynamic>{
+      'concepto':          concepto,
+      'tipo':              tipo,
+      'monto':             monto,
+      if (estadoPago != null)       'estado_pago':       estadoPago,
+      if (fechaPago != null)        'fecha_pago':        fechaPago,
+      if (metodoPago != null)       'metodo_pago':       metodoPago,
+      if (referenciaPago != null)   'referencia_pago':   referenciaPago,
+      if (appointmentId != null)    'appointment_id':    appointmentId,
+      if (fechaVencimiento != null) 'fecha_vencimiento': fechaVencimiento,
+      if (notas != null)            'notas':             notas,
+    };
+
+    final response = await ApiService.postAuth(_endpoint, body);
+    if (response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      return {
+        'success': true,
+        'message': data['message'],
+        'payment': Payment.fromJson(data['data']),
+      };
     }
+    final error = jsonDecode(response.body);
+    return {'success': false, 'message': error['message'] ?? 'Error al crear pago'};
+  } catch (e) {
+    return {'success': false, 'message': 'Error de conexión: $e'};
   }
+}
 
   static Future<Map<String, dynamic>> update(int id, Map<String, dynamic> data) async {
     try {

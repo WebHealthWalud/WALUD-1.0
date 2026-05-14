@@ -63,7 +63,6 @@ class User {
   final String? profilePhotoPath;
   final String? photoUrl;
   final String? phone;
-  // Nuevos campos
   final String? genero;
   final String? tipoSangre;
   final String? alergias;
