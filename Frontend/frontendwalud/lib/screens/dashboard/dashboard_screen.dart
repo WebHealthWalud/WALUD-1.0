@@ -11,7 +11,8 @@ import '../profile/patient_profile_screen.dart';
 import '../profile/doctor_profile_screen.dart';
 import '../payments/payments_screen.dart';
 import '../../widgets/ai_floating_widget.dart';
-
+import '../../services/payment_service.dart';
+import '../patients/patients_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -50,6 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(icon: Icons.calendar_today_outlined,  label: 'Citas'),
     _NavItem(icon: Icons.history_outlined,         label: 'Historial'),
   ];
+  if (_currentUser?.isDoctor == true) {
+    items.add(_NavItem(icon: Icons.people_outlined, label: 'Pacientes'));
+  }
   if (_currentUser?.isPatient == true) {
     items.add(_NavItem(icon: Icons.payment_outlined, label: 'Pagos'));
     items.add(_NavItem(icon: Icons.headset_mic_outlined, label: 'Soporte'));
@@ -61,6 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int get _perfilIndex  => _navItems.length - 1;
   int get _pagosIndex   => _currentUser?.isPatient == true ? 3 : -1;
   int get _soporteIndex => _currentUser?.isPatient == true ? 4 : -1;
+  int get _pacientesIndex => _currentUser?.isDoctor == true ? 3 : -1;
 
   Widget _buildScreen(int idx) {
   if (idx == 0) {
@@ -69,10 +74,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onNavigate: (i) => setState(() => _selectedIndex = i),
     );
   }
-  if (idx == 1) return const AppointmentsListScreen();
+  if (idx == 1) return AppointmentsListScreen(
+  onNavigate: (i) => setState(() => _selectedIndex = i),
+);
   if (idx == 2) return _HistorialTab();
   if (idx == _pagosIndex)   return const PaymentsScreen();
   if (idx == _soporteIndex) return _SoporteTab();
+  if (idx == _pacientesIndex) return const PatientsScreen();
   if (idx == _perfilIndex)  {
     if (_currentUser?.isDoctor == true) {
       return const DoctorProfileScreen();
@@ -195,8 +203,18 @@ backgroundColor: const Color(0xFFF0F4F8),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
             child: GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => const CreateAppointmentScreen())),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => CreateAppointmentScreen(
+                        onCreated: () => setState(() {
+                          // ✅ Paciente → ir a pagos, médico → ir a citas
+                          if (_currentUser?.isPatient == true) {
+                            _selectedIndex = _pagosIndex;
+                          } else {
+                            _selectedIndex = 1; // Citas
+                          }
+                        }),
+                      ),
+                    )),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
@@ -301,9 +319,8 @@ class _NavItem {
   const _NavItem({required this.icon, required this.label});
 }
 
-// ── HOME TAB
 class _HomeTab extends StatefulWidget {
-  final User?       user;
+  final User?         user;
   final Function(int) onNavigate;
   const _HomeTab({this.user, required this.onNavigate});
 
@@ -313,6 +330,7 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> {
   Appointment? _nextAppointment;
+  int          _pagosPendientes = 0;
 
   @override
   void initState() {
@@ -327,7 +345,17 @@ class _HomeTabState extends State<_HomeTab> {
       final now      = DateTime.now();
       final upcoming = list.where((a) => a.dateTime.isAfter(now)).toList()
         ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
-      setState(() => _nextAppointment = upcoming.isNotEmpty ? upcoming.first : null);
+      setState(() => _nextAppointment =
+          upcoming.isNotEmpty ? upcoming.first : null);
+    }
+
+    // ✅ Cargar pagos pendientes solo para pacientes
+    if (widget.user?.isPatient == true) {
+      final pagosR = await PaymentService.getAll(estadoPago: 'pendiente');
+      if (pagosR['success'] == true && mounted) {
+        setState(() => _pagosPendientes =
+            (pagosR['payments'] as List).length);
+      }
     }
   }
 
@@ -340,41 +368,90 @@ class _HomeTabState extends State<_HomeTab> {
         Row(children: [
           Expanded(child: Text('Hola, ${user?.name ?? 'Usuario'}',
             style: const TextStyle(
-              fontSize: 36, fontWeight: FontWeight.w900, color: Color(0xFF1A1A7A)))),
+              fontSize: 36, fontWeight: FontWeight.w900,
+              color: Color(0xFF1A1A7A)))),
           if (_nextAppointment != null)
             _NextAppointmentCard(appointment: _nextAppointment!),
         ]),
+
+        // ✅ Banner pagos pendientes — solo pacientes
+        if (_pagosPendientes > 0 && user?.isPatient == true) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF59E0B)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFF59E0B), size: 24),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  _pagosPendientes == 1
+                      ? 'Tienes 1 pago pendiente'
+                      : 'Tienes $_pagosPendientes pagos pendientes',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF92400E), fontSize: 14,
+                  )),
+                const Text(
+                  'Realiza tu pago para confirmar tu cita médica.',
+                  style: TextStyle(
+                      color: Color(0xFF92400E), fontSize: 12)),
+              ])),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: () => widget.onNavigate(3),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF59E0B),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                ),
+                child: const Text('Pagar ahora',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ]),
+          ),
+        ],
+
         const SizedBox(height: 36),
         Row(children: [
           Expanded(child: _QuickCard(
-            icon: Icons.calendar_month_outlined,
-            iconColor: const Color(0xFF4F46E5),
-            iconBg: const Color(0xFFEDE9FE),
-            title: 'Agendar Cita',
-            subtitle: 'Encuentra especialistas disponibles en tu zona hoy mismo para tu próxima revisión.',
+            icon:        Icons.calendar_month_outlined,
+            iconColor:   const Color(0xFF4F46E5),
+            iconBg:      const Color(0xFFEDE9FE),
+            title:       'Agendar Cita',
+            subtitle:    'Encuentra especialistas disponibles en tu zona hoy mismo para tu próxima revisión.',
             actionLabel: 'Comenzar',
-            onTap: () => widget.onNavigate(1),
+            onTap:       () => widget.onNavigate(1),
           )),
           const SizedBox(width: 20),
           Expanded(child: _QuickCard(
-            icon: Icons.receipt_long_outlined,
-            iconColor: const Color(0xFF0D9488),
-            iconBg: const Color(0xFFCCFBF1),
-            title: 'Ver Historial',
-            subtitle: 'Accede a tus resultados, recetas y diagnósticos anteriores de forma segura.',
+            icon:        Icons.receipt_long_outlined,
+            iconColor:   const Color(0xFF0D9488),
+            iconBg:      const Color(0xFFCCFBF1),
+            title:       'Ver Historial',
+            subtitle:    'Accede a tus resultados, recetas y diagnósticos anteriores de forma segura.',
             actionLabel: 'Consultar',
-            onTap: () => widget.onNavigate(2),
+            onTap:       () => widget.onNavigate(2),
           )),
           if (user?.isPatient == true) ...[
             const SizedBox(width: 20),
             Expanded(child: _QuickCard(
-              icon: Icons.account_balance_wallet_outlined,
-              iconColor: const Color(0xFF7C3AED),
-              iconBg: const Color(0xFFEDE9FE),
-              title: 'Realizar Pago',
-              subtitle: 'Gestiona tus facturas pendientes y métodos de pago seguros vinculados a tu cuenta.',
+              icon:        Icons.account_balance_wallet_outlined,
+              iconColor:   const Color(0xFF7C3AED),
+              iconBg:      const Color(0xFFEDE9FE),
+              title:       'Realizar Pago',
+              subtitle:    'Gestiona tus facturas pendientes y métodos de pago seguros vinculados a tu cuenta.',
               actionLabel: 'Pagar ahora',
-              onTap: () => widget.onNavigate(3),
+              onTap:       () => widget.onNavigate(3),
             )),
           ],
         ]),

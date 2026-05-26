@@ -195,6 +195,18 @@ class AppointmentController extends Controller
                 'status'           => 'pendiente',
                 'notes'            => $validated['notes'] ?? null,
             ]);
+                if ($user->tipo_usuario === 'medico') {
+                    \App\Models\Payment::create([
+                        'patient_id'        => $patientId,
+                        'appointment_id'    => $appointment->id,
+                        'concepto'          => 'Consulta ' . $validated['especialidad'] . ' — Dr. ' . $user->name . ' ' . $user->last_name,
+                        'tipo'              => 'consulta',
+                        'monto'             => 85000,
+                        'estado_pago'       => 'pendiente',
+                        'fecha_vencimiento' => now()->addDays(3)->toDateString(),
+                        'notas'             => 'Cita agendada por el médico. Pendiente de pago.',
+                    ]);
+                }
 
             return response()->json([
                 'message' => 'Cita creada correctamente',
