@@ -12,8 +12,21 @@ class AIService
     {
         try {
 
+            $especialidadesValidas = [
+                'Medicina General',
+                'Psicología',
+                'Psiquiatría',
+                'Dermatología',
+                'Nutrición y Dietética',
+                'Pediatría',
+                'Ginecología',
+                'Medicina Interna',
+                'Endocrinología',
+                'Cardiología',
+            ];
+
             $prompt = "
-Eres un asistente médico de orientación clínica para WALUD.
+Eres un asistente médico virtual de WALUD.
 
 Tu función es:
 - orientar pacientes
@@ -26,22 +39,36 @@ IMPORTANTE:
 - NO reemplaces médicos
 - SOLO orientación básica
 
+SOLO puedes recomendar UNA de estas especialidades EXACTAMENTE como aparecen aquí:
+
+- Medicina General
+- Psicología
+- Psiquiatría
+- Dermatología
+- Nutrición y Dietética
+- Pediatría
+- Ginecología
+- Medicina Interna
+- Endocrinología
+- Cardiología
+
 Clasifica prioridad:
 - Baja
 - Media
 - Alta
 
-Si detectas síntomas graves:
+Si detectas síntomas graves como:
 - dificultad respiratoria
 - dolor intenso en pecho
 - pérdida de conciencia
 - sangrado severo
 
-marca urgente=true.
+entonces urgente=true.
 
-RESPONDE ÚNICAMENTE EN JSON.
+RESPONDE ÚNICAMENTE EN JSON VÁLIDO.
 
-Formato:
+Formato exacto:
+
 {
   \"especialidad\": \"...\",
   \"prioridad\": \"...\",
@@ -50,12 +77,12 @@ Formato:
   \"resumen\": \"...\"
 }
 
-Síntomas:
+Síntomas del paciente:
 $mensaje
 ";
 
             $response = Http::withHeaders([
-               'Authorization' => 'Bearer ' . Config::get('services.openai.key'),
+                'Authorization' => 'Bearer ' . Config::get('services.openai.key'),
                 'Content-Type' => 'application/json',
             ])->post('https://api.openai.com/v1/chat/completions', [
 
@@ -64,7 +91,7 @@ $mensaje
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'Eres un asistente médico.'
+                        'content' => 'Eres un asistente médico virtual de WALUD.'
                     ],
                     [
                         'role' => 'user',
@@ -89,7 +116,44 @@ $mensaje
 
             $content = $response['choices'][0]['message']['content'];
 
-            $decoded = json_decode($content, true);
+            // Limpiar posibles bloques markdown
+            $content = str_replace(['```json', '```'], '', $content);
+
+            $decoded = json_decode(trim($content), true);
+
+            // Validar JSON
+            if (!$decoded) {
+
+                Log::error('JSON INVALIDO IA', [
+                    'content' => $content
+                ]);
+
+                return [
+                    'error' => true,
+                    'message' => 'La IA devolvió un formato inválido'
+                ];
+            }
+
+            // Validar especialidad
+            if (
+                !isset($decoded['especialidad']) ||
+                !in_array($decoded['especialidad'], $especialidadesValidas)
+            ) {
+                $decoded['especialidad'] = 'Medicina General';
+            }
+
+            // Validar prioridad
+            if (
+                !isset($decoded['prioridad']) ||
+                !in_array($decoded['prioridad'], ['Baja', 'Media', 'Alta'])
+            ) {
+                $decoded['prioridad'] = 'Media';
+            }
+
+            // Validar urgente
+            if (!isset($decoded['urgente'])) {
+                $decoded['urgente'] = false;
+            }
 
             return $decoded;
 
