@@ -10,6 +10,8 @@ import '../../services/patient_profile_service.dart';
 import '../../services/patient_document_service.dart';
 import '../../services/profile_service.dart';
 
+const double _kProfBreakpoint = 800;
+
 class PatientProfileScreen extends StatefulWidget {
   const PatientProfileScreen({super.key});
 
@@ -36,7 +38,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   final _contactoTelefonoCtrl = TextEditingController();
   final _contactoRelacionCtrl = TextEditingController();
 
-  // ✅ Seguridad
+  // Seguridad
   bool _isChangingPass   = false;
   bool _showSecurityForm = false;
   bool _obscureCurrent   = true;
@@ -183,7 +185,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
   }
 
-  // ✅ Cambiar contraseña
   Future<void> _changePassword() async {
     if (_newPassCtrl.text != _confirmPassCtrl.text) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -355,30 +356,45 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           child: CircularProgressIndicator(color: Color(0xFF4F46E5)));
     }
 
+    final isNarrow = MediaQuery.of(context).size.width < _kProfBreakpoint;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (_profile?.isComplete == false) _buildIncompleteBanner(),
-        _buildHeader(),
+        _buildHeader(isNarrow),
         const SizedBox(height: 24),
         if (_showCompleteForm) ...[
-          _buildCompleteProfileForm(),
+          _buildCompleteProfileForm(isNarrow),
           const SizedBox(height: 24),
         ],
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(child: Column(children: [
+
+        // ── RESPONSIVO: en pantallas pequeñas apila las columnas
+        if (isNarrow)
+          Column(children: [
             _buildFichaMedica(),
             const SizedBox(height: 20),
-            _buildContactoEmergencia(),
-          ])),
-          const SizedBox(width: 20),
-          Expanded(child: Column(children: [
             _buildHistorialCitas(),
             const SizedBox(height: 20),
+            _buildContactoEmergencia(),
+            const SizedBox(height: 20),
             _buildDocumentosMedicos(),
-          ])),
-        ]),
-        // ✅ Sección seguridad
+          ])
+        else
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: Column(children: [
+              _buildFichaMedica(),
+              const SizedBox(height: 20),
+              _buildContactoEmergencia(),
+            ])),
+            const SizedBox(width: 20),
+            Expanded(child: Column(children: [
+              _buildHistorialCitas(),
+              const SizedBox(height: 20),
+              _buildDocumentosMedicos(),
+            ])),
+          ]),
+
         const SizedBox(height: 20),
         _buildSecurityCard(),
       ]),
@@ -417,8 +433,99 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  // ── RESPONSIVO: en pantallas pequeñas el botón "Editar Perfil" baja
+  Widget _buildHeader(bool isNarrow) {
     final edad = _calcularEdad(_user?.birthDate);
+
+    if (isNarrow) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(children: [
+          Row(children: [
+            Stack(children: [
+              Container(
+                width: 70, height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  gradient: _user?.hasPhoto != true
+                      ? const LinearGradient(
+                          colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)])
+                      : null,
+                ),
+                child: _user?.hasPhoto == true
+                    ? ClipOval(child: Image.network(
+                        '${_user!.fullPhotoUrl!}?t=${DateTime.now().millisecondsSinceEpoch}',
+                        key: ValueKey(_user!.fullPhotoUrl),
+                        fit: BoxFit.cover, width: 70, height: 70,
+                        errorBuilder: (_, __, ___) => _avatarFallback()))
+                    : _avatarFallback(),
+              ),
+              Positioned(
+                bottom: 0, right: 0,
+                child: GestureDetector(
+                  onTap: _isUploadingPhoto ? null : _pickAndUploadPhoto,
+                  child: Container(
+                    width: 24, height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2)),
+                    child: _isUploadingPhoto
+                        ? const Padding(padding: EdgeInsets.all(4),
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.camera_alt, color: Colors.white, size: 13)),
+                ),
+              ),
+            ]),
+            const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_user?.fullName ?? '', style: const TextStyle(
+                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Row(children: [
+                const Icon(Icons.cake_outlined, color: Colors.white70, size: 13),
+                const SizedBox(width: 4),
+                Text('$edad años',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ]),
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.fingerprint, color: Colors.white70, size: 13),
+                const SizedBox(width: 4),
+                Text('ID: WL-${_user?.id?.toString().padLeft(5, '0') ?? '00000'}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ]),
+            ])),
+          ]),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => setState(() => _showCompleteForm = !_showCompleteForm),
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Editar Perfil'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF1A237E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+            ),
+          ),
+        ]),
+      );
+    }
+
+    // Pantalla ancha — igual que antes
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -444,10 +551,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 ? ClipOval(child: Image.network(
                     '${_user!.fullPhotoUrl!}?t=${DateTime.now().millisecondsSinceEpoch}',
                     key: ValueKey(_user!.fullPhotoUrl),
-                    fit: BoxFit.cover,
-                    width: 80, height: 80,
-                    errorBuilder: (_, __, ___) => _avatarFallback(),
-                  ))
+                    fit: BoxFit.cover, width: 80, height: 80,
+                    errorBuilder: (_, __, ___) => _avatarFallback()))
                 : _avatarFallback(),
           ),
           Positioned(
@@ -459,24 +564,19 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF4F46E5),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
+                  border: Border.all(color: Colors.white, width: 2)),
                 child: _isUploadingPhoto
-                    ? const Padding(
-                        padding: EdgeInsets.all(4),
+                    ? const Padding(padding: EdgeInsets.all(4),
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.camera_alt,
-                        color: Colors.white, size: 14),
-              ),
+                    : const Icon(Icons.camera_alt, color: Colors.white, size: 14)),
             ),
           ),
         ]),
         const SizedBox(width: 20),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_user?.fullName ?? '', style: const TextStyle(
-            color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold,
-          )),
+            color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           Row(children: [
             const Icon(Icons.cake_outlined, color: Colors.white70, size: 14),
@@ -485,8 +585,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 style: const TextStyle(color: Colors.white70, fontSize: 13)),
             const SizedBox(width: 16),
             if (_profile?.ciudad != null) ...[
-              const Icon(Icons.location_on_outlined,
-                  color: Colors.white70, size: 14),
+              const Icon(Icons.location_on_outlined, color: Colors.white70, size: 14),
               const SizedBox(width: 4),
               Text(_profile!.ciudad!,
                   style: const TextStyle(color: Colors.white70, fontSize: 13)),
@@ -496,70 +595,100 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           Row(children: [
             const Icon(Icons.fingerprint, color: Colors.white70, size: 14),
             const SizedBox(width: 4),
-            Text(
-              'ID: WL-${_user?.id?.toString().padLeft(5, '0') ?? '00000'}',
-              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text('ID: WL-${_user?.id?.toString().padLeft(5, '0') ?? '00000'}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
           ]),
         ])),
         ElevatedButton.icon(
-          onPressed: () =>
-              setState(() => _showCompleteForm = !_showCompleteForm),
+          onPressed: () => setState(() => _showCompleteForm = !_showCompleteForm),
           icon: const Icon(Icons.edit_outlined, size: 16),
           label: const Text('Editar Perfil'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF1A237E),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
         ),
       ]),
     );
   }
 
-  Widget _buildCompleteProfileForm() {
+  Widget _buildCompleteProfileForm(bool isNarrow) {
     return _card(
       title: 'Completar Perfil',
       icon:  Icons.edit_outlined,
       child: Column(children: [
-        Row(children: [
-          Expanded(child: _field('Peso (kg)', _pesoCtrl,
-            icon: Icons.monitor_weight_outlined,
-            keyboardType: TextInputType.number,
-          )),
-          const SizedBox(width: 16),
-          Expanded(child: _field('Talla (m)', _tallaCtrl,
+        // En pantallas pequeñas los campos van en columna
+        if (isNarrow) ...[
+          _field('Peso (kg)', _pesoCtrl,
+            icon: Icons.monitor_weight_outlined, keyboardType: TextInputType.number),
+          const SizedBox(height: 12),
+          _fieldWithHint('Talla', _tallaCtrl,
             icon: Icons.height,
-            keyboardType: TextInputType.number,
-          )),
-        ]),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: _field('Dirección', _direccionCtrl,
-            icon: Icons.home_outlined)),
-          const SizedBox(width: 16),
-          Expanded(child: _field('Ciudad', _ciudadCtrl,
-            icon: Icons.location_city_outlined)),
-        ]),
+            hint: 'Ej: 1.75',
+            helperText: 'En metros (máx. 3.00)',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (v == null || v.isEmpty) return null;
+              final val = double.tryParse(v.replaceAll(',', '.'));
+              if (val == null) return 'Ingresa un número válido';
+              if (val > 3.0) return 'Máximo 3.00 metros';
+              if (val <= 0) return 'Ingresa un valor válido';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _field('Dirección', _direccionCtrl, icon: Icons.home_outlined),
+          const SizedBox(height: 12),
+          _field('Ciudad', _ciudadCtrl, icon: Icons.location_city_outlined),
+        ] else ...[
+          Row(children: [
+            Expanded(child: _field('Peso (kg)', _pesoCtrl,
+              icon: Icons.monitor_weight_outlined, keyboardType: TextInputType.number)),
+            const SizedBox(width: 16),
+            Expanded(child: _fieldWithHint('Talla', _tallaCtrl,
+              icon: Icons.height,
+              hint: 'Ej: 1.75',
+              helperText: 'En metros (máx. 3.00)',
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) {
+                if (v == null || v.isEmpty) return null;
+                final val = double.tryParse(v.replaceAll(',', '.'));
+                if (val == null) return 'Ingresa un número válido';
+                if (val > 3.0) return 'Máximo 3.00 metros';
+                if (val <= 0) return 'Ingresa un valor válido';
+                return null;
+              },
+            )),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: _field('Dirección', _direccionCtrl, icon: Icons.home_outlined)),
+            const SizedBox(width: 16),
+            Expanded(child: _field('Ciudad', _ciudadCtrl, icon: Icons.location_city_outlined)),
+          ]),
+        ],
         const SizedBox(height: 16),
         const Divider(),
         const SizedBox(height: 8),
         const Align(
           alignment: Alignment.centerLeft,
           child: Text('Contacto de Emergencia', style: TextStyle(
-            fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A),
-          )),
-        ),
+            fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A)))),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: _field('Nombre', _contactoNombreCtrl,
-            icon: Icons.person_outline)),
-          const SizedBox(width: 16),
-          Expanded(child: _field('Teléfono', _contactoTelefonoCtrl,
-            icon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-          )),
-        ]),
+        if (isNarrow) ...[
+          _field('Nombre', _contactoNombreCtrl, icon: Icons.person_outline),
+          const SizedBox(height: 12),
+          _field('Teléfono', _contactoTelefonoCtrl,
+            icon: Icons.phone_outlined, keyboardType: TextInputType.phone),
+        ] else
+          Row(children: [
+            Expanded(child: _field('Nombre', _contactoNombreCtrl,
+              icon: Icons.person_outline)),
+            const SizedBox(width: 16),
+            Expanded(child: _field('Teléfono', _contactoTelefonoCtrl,
+              icon: Icons.phone_outlined, keyboardType: TextInputType.phone)),
+          ]),
         const SizedBox(height: 16),
         _field('Relación (Ej: Madre, Esposo)', _contactoRelacionCtrl,
           icon: Icons.people_outline),
@@ -570,9 +699,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFF4F46E5)),
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('Cancelar',
                 style: TextStyle(color: Color(0xFF4F46E5))),
           )),
@@ -583,19 +710,56 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               backgroundColor: const Color(0xFF4F46E5),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: _isSaving
                 ? const SizedBox(width: 20, height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
-                : const Text('Guardar',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Guardar', style: TextStyle(fontWeight: FontWeight.bold)),
           )),
         ]),
       ]),
     );
+  }
+
+  Widget _fieldWithHint(String label, TextEditingController ctrl, {
+    IconData? icon,
+    String? hint,
+    String? helperText,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(
+        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+      const SizedBox(height: 6),
+      TextFormField(
+        controller: ctrl,
+        keyboardType: keyboardType,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
+        validator: validator,
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: hint,
+          helperText: helperText,
+          helperStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
+          prefixIcon: icon != null
+              ? Icon(icon, size: 18, color: Colors.grey[400]) : null,
+          filled: true, fillColor: const Color(0xFFF9FAFB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Colors.red, width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+      ),
+    ]);
   }
 
   Widget _buildFichaMedica() {
@@ -604,26 +768,16 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       icon:  Icons.medical_information_outlined,
       child: Column(children: [
         Row(children: [
-          Expanded(child: _fichaItem(
-            'TIPO DE SANGRE',
-            _user?.tipoSangre ?? '—',
-            const Color(0xFFEF4444),
-            Icons.water_drop_outlined,
-          )),
+          Expanded(child: _fichaItem('TIPO DE SANGRE',
+            _user?.tipoSangre ?? '—', const Color(0xFFEF4444), Icons.water_drop_outlined)),
           const SizedBox(width: 12),
-          Expanded(child: _fichaItem(
-            'PESO',
+          Expanded(child: _fichaItem('PESO',
             _profile?.peso != null ? '${_profile!.peso} kg' : '—',
-            const Color(0xFF4F46E5),
-            Icons.monitor_weight_outlined,
-          )),
+            const Color(0xFF4F46E5), Icons.monitor_weight_outlined)),
           const SizedBox(width: 12),
-          Expanded(child: _fichaItem(
-            'TALLA',
+          Expanded(child: _fichaItem('TALLA',
             _profile?.talla != null ? '${_profile!.talla} m' : '—',
-            const Color(0xFF06B6D4),
-            Icons.height,
-          )),
+            const Color(0xFF06B6D4), Icons.height)),
         ]),
         if (_user?.alergias != null && _user!.alergias!.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -633,25 +787,19 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             alignment: Alignment.centerLeft,
             child: Text('ALERGIAS', style: TextStyle(
               fontSize: 10, fontWeight: FontWeight.bold,
-              color: Colors.grey, letterSpacing: 1,
-            )),
-          ),
+              color: Colors.grey, letterSpacing: 1))),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: Wrap(
               spacing: 8, runSpacing: 6,
               children: _user!.alergias!.split(',').map((a) => Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                  borderRadius: BorderRadius.circular(20)),
                 child: Text(a.trim(), style: const TextStyle(
-                  color: Color(0xFFEF4444),
-                  fontSize: 12, fontWeight: FontWeight.w500,
-                )),
+                  color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w500)),
               )).toList(),
             ),
           ),
@@ -664,20 +812,15 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
+        color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
       child: Column(children: [
         Icon(icon, color: color, size: 24),
         const SizedBox(height: 8),
         Text(label, style: const TextStyle(
-          fontSize: 9, color: Colors.grey,
-          letterSpacing: 1, fontWeight: FontWeight.bold,
-        )),
+          fontSize: 9, color: Colors.grey, letterSpacing: 1, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(
-          fontSize: 18, fontWeight: FontWeight.bold, color: color,
-        )),
+          fontSize: 18, fontWeight: FontWeight.bold, color: color)),
       ]),
     );
   }
@@ -693,67 +836,51 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
+                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(14)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.person_outline,
-                        color: Colors.white, size: 20),
-                  ),
+                      color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                    child: const Icon(Icons.person_outline, color: Colors.white, size: 20)),
                   const SizedBox(width: 12),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(_profile!.contactoEmergenciaNombre!,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold, fontSize: 16,
-                      )),
+                        color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                     if (_profile?.contactoEmergenciaRelacion != null)
                       Text(_profile!.contactoEmergenciaRelacion!,
-                        style: const TextStyle(
-                          color: Colors.white70, fontSize: 12)),
+                        style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   ]),
                 ]),
                 if (_profile?.contactoEmergenciaTelefono != null) ...[
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                      borderRadius: BorderRadius.circular(10)),
                     child: Row(children: [
-                      const Icon(Icons.phone_outlined,
-                          color: Colors.white, size: 18),
+                      const Icon(Icons.phone_outlined, color: Colors.white, size: 18),
                       const SizedBox(width: 10),
                       Text(_profile!.contactoEmergenciaTelefono!,
-                        style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ]),
                   ),
                 ],
-              ]),
-            )
+              ]))
           : Center(child: Column(children: [
               const SizedBox(height: 8),
-              Icon(Icons.emergency_outlined,
-                  size: 40, color: Colors.grey[300]),
+              Icon(Icons.emergency_outlined, size: 40, color: Colors.grey[300]),
               const SizedBox(height: 8),
               Text('Sin contacto de emergencia',
                   style: TextStyle(color: Colors.grey[400])),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => setState(() => _showCompleteForm = true),
-                child: const Text('Agregar ahora'),
-              ),
+                child: const Text('Agregar ahora')),
             ])),
     );
   }
@@ -764,16 +891,12 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       icon:  Icons.calendar_month_outlined,
       trailing: TextButton(
         onPressed: () {},
-        child: const Text('Ver todo',
-            style: TextStyle(color: Color(0xFF4F46E5))),
-      ),
+        child: const Text('Ver todo', style: TextStyle(color: Color(0xFF4F46E5)))),
       child: const Center(
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Text('Próximamente disponible',
-              style: TextStyle(color: Colors.grey)),
-        ),
-      ),
+              style: TextStyle(color: Colors.grey)))),
     );
   }
 
@@ -785,26 +908,21 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         onPressed: _isUploading ? null : _pickAndUploadDocument,
         icon: _isUploading
             ? const SizedBox(width: 14, height: 14,
-                child: CircularProgressIndicator(
-                  color: Colors.white, strokeWidth: 2))
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : const Icon(Icons.upload_outlined, size: 16),
         label: const Text('Subir Nuevo'),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF4F46E5),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20)),
-        ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
       ),
       child: _documents.isEmpty
           ? Center(child: Column(children: [
               const SizedBox(height: 16),
-              Icon(Icons.folder_open_outlined,
-                  size: 48, color: Colors.grey[300]),
+              Icon(Icons.folder_open_outlined, size: 48, color: Colors.grey[300]),
               const SizedBox(height: 8),
-              Text('Sin documentos médicos',
-                  style: TextStyle(color: Colors.grey[400])),
+              Text('Sin documentos médicos', style: TextStyle(color: Colors.grey[400])),
               const SizedBox(height: 16),
             ]))
           : GridView.builder(
@@ -814,8 +932,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 2,
-              ),
+                childAspectRatio: 2),
               itemCount: _documents.length,
               itemBuilder: (_, i) => _documentCard(_documents[i]),
             ),
@@ -830,101 +947,75 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+        border: Border.all(color: Colors.grey.shade200)),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
+            color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
           child: Icon(
             isImage ? Icons.image_outlined : Icons.picture_as_pdf_outlined,
-            color: color, size: 20,
-          ),
-        ),
+            color: color, size: 20)),
         const SizedBox(width: 8),
         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(doc.nombre, style: const TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A7A),
-            ), overflow: TextOverflow.ellipsis),
+              fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1A1A7A)),
+              overflow: TextOverflow.ellipsis),
             Text('${doc.tipoLabel} • ${doc.tamanioLegible}',
               style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-          ],
-        )),
+          ])),
         IconButton(
           icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
           onPressed: () => _deleteDocument(doc),
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
+          constraints: const BoxConstraints()),
       ]),
     );
   }
 
-  // ✅ Seguridad
   Widget _buildSecurityCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white, borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(
           color: Colors.black.withOpacity(0.04),
-          blurRadius: 10, offset: const Offset(0, 4),
-        )],
+          blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.lock_outline,
-              color: Color(0xFF1A1A7A), size: 20),
+          const Icon(Icons.lock_outline, color: Color(0xFF1A1A7A), size: 20),
           const SizedBox(width: 8),
           const Text('Seguridad', style: TextStyle(
-            fontSize: 15, fontWeight: FontWeight.bold,
-            color: Color(0xFF1A1A7A),
-          )),
+            fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
           const Spacer(),
           TextButton.icon(
-            onPressed: () => setState(
-                () => _showSecurityForm = !_showSecurityForm),
+            onPressed: () => setState(() => _showSecurityForm = !_showSecurityForm),
             icon: Icon(
-              _showSecurityForm
-                  ? Icons.expand_less : Icons.expand_more,
-              size: 18,
-            ),
-            label: Text(
-                _showSecurityForm ? 'Cerrar' : 'Cambiar contraseña'),
-            style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF4F46E5)),
-          ),
+              _showSecurityForm ? Icons.expand_less : Icons.expand_more, size: 18),
+            label: Text(_showSecurityForm ? 'Cerrar' : 'Cambiar contraseña'),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF4F46E5))),
         ]),
         if (_showSecurityForm) ...[
           const SizedBox(height: 16),
           const Divider(),
           const SizedBox(height: 16),
-          _passField('Contraseña actual', _currentPassCtrl,
-              _obscureCurrent,
-              () => setState(
-                  () => _obscureCurrent = !_obscureCurrent)),
+          _passField('Contraseña actual', _currentPassCtrl, _obscureCurrent,
+              () => setState(() => _obscureCurrent = !_obscureCurrent)),
           const SizedBox(height: 16),
-          _passField('Nueva contraseña', _newPassCtrl,
-              _obscureNew,
+          _passField('Nueva contraseña', _newPassCtrl, _obscureNew,
               () => setState(() => _obscureNew = !_obscureNew)),
           if (_newPassCtrl.text.isNotEmpty) ...[
             const SizedBox(height: 10),
             _buildStrengthIndicator(),
           ],
           const SizedBox(height: 16),
-          _passField('Confirmar nueva contraseña', _confirmPassCtrl,
-              _obscureConfirm,
-              () => setState(
-                  () => _obscureConfirm = !_obscureConfirm)),
+          _passField('Confirmar nueva contraseña', _confirmPassCtrl, _obscureConfirm,
+              () => setState(() => _obscureConfirm = !_obscureConfirm)),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -934,13 +1025,10 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                 backgroundColor: const Color(0xFF1A237E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               child: _isChangingPass
                   ? const SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Text('Cambiar Contraseña',
                       style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -954,62 +1042,42 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       bool obscure, VoidCallback toggle) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(
-        fontSize: 12, fontWeight: FontWeight.w600,
-        color: Color(0xFF374151),
-      )),
+        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
       const SizedBox(height: 6),
       TextFormField(
         controller: ctrl,
         obscureText: obscure,
         decoration: InputDecoration(
-          prefixIcon: Icon(Icons.lock_outline,
-              size: 18, color: Colors.grey[400]),
+          prefixIcon: Icon(Icons.lock_outline, size: 18, color: Colors.grey[400]),
           suffixIcon: IconButton(
             icon: Icon(
-              obscure
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              color: Colors.grey, size: 18,
-            ),
-            onPressed: toggle,
-          ),
-          filled: true,
-          fillColor: const Color(0xFFF9FAFB),
+              obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              color: Colors.grey, size: 18),
+            onPressed: toggle),
+          filled: true, fillColor: const Color(0xFFF9FAFB),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(
-                color: Color(0xFF4F46E5), width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 12),
-        ),
+            borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
       ),
     ]);
   }
 
   Widget _buildStrengthIndicator() {
-    final color = _strength <= 2
-        ? Colors.red
-        : _strength <= 3
-            ? Colors.orange
-            : _strength <= 4
-                ? Colors.yellow.shade700
-                : Colors.green;
-    final label = _strength <= 2
-        ? 'Débil'
-        : _strength <= 3
-            ? 'Regular'
-            : _strength <= 4
-                ? 'Buena'
-                : 'Fuerte';
+    final color = _strength <= 2 ? Colors.red
+        : _strength <= 3 ? Colors.orange
+        : _strength <= 4 ? Colors.yellow.shade700
+        : Colors.green;
+    final label = _strength <= 2 ? 'Débil'
+        : _strength <= 3 ? 'Regular'
+        : _strength <= 4 ? 'Buena'
+        : 'Fuerte';
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -1019,13 +1087,10 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             value: _strength / 5,
             backgroundColor: Colors.grey.shade200,
             valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 5,
-          ),
-        )),
+            minHeight: 5))),
         const SizedBox(width: 10),
         Text(label, style: TextStyle(
-          color: color, fontSize: 12, fontWeight: FontWeight.bold,
-        )),
+          color: color, fontSize: 12, fontWeight: FontWeight.bold)),
       ]),
       const SizedBox(height: 8),
       Wrap(spacing: 6, runSpacing: 4, children: [
@@ -1044,8 +1109,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       color: met ? Colors.green.withOpacity(0.1) : Colors.grey.shade100,
       borderRadius: BorderRadius.circular(20),
       border: Border.all(
-          color: met ? Colors.green.shade300 : Colors.grey.shade300),
-    ),
+          color: met ? Colors.green.shade300 : Colors.grey.shade300)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(met ? Icons.check : Icons.close,
           size: 11, color: met ? Colors.green : Colors.grey),
@@ -1053,8 +1117,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       Text(label, style: TextStyle(
         fontSize: 10,
         color: met ? Colors.green : Colors.grey,
-        fontWeight: FontWeight.w500,
-      )),
+        fontWeight: FontWeight.w500)),
     ]),
   );
 
@@ -1068,21 +1131,17 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white, borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(
           color: Colors.black.withOpacity(0.04),
-          blurRadius: 10, offset: const Offset(0, 4),
-        )],
+          blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(icon, color: const Color(0xFF1A1A7A), size: 20),
           const SizedBox(width: 8),
           Text(title, style: const TextStyle(
-            fontSize: 15, fontWeight: FontWeight.bold,
-            color: Color(0xFF1A1A7A),
-          )),
+            fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A))),
           if (trailing != null) ...[const Spacer(), trailing],
         ]),
         const SizedBox(height: 16),
@@ -1092,13 +1151,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   }
 
   Widget _field(String label, TextEditingController ctrl, {
-    IconData?      icon,
-    TextInputType? keyboardType,
+    IconData? icon, TextInputType? keyboardType,
   }) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(
-        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF374151),
-      )),
+        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
       const SizedBox(height: 6),
       TextFormField(
         controller: ctrl,
@@ -1106,24 +1163,17 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         decoration: InputDecoration(
           prefixIcon: icon != null
               ? Icon(icon, size: 18, color: Colors.grey[400]) : null,
-          filled: true,
-          fillColor: const Color(0xFFF9FAFB),
+          filled: true, fillColor: const Color(0xFFF9FAFB),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
+            borderSide: BorderSide(color: Colors.grey.shade200)),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(
-                color: Color(0xFF4F46E5), width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 12),
-        ),
+            borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
       ),
     ]);
   }
@@ -1132,9 +1182,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     child: Text(
       _user?.name.isNotEmpty == true ? _user!.name[0].toUpperCase() : '?',
       style: const TextStyle(
-        color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-    ),
-  );
+        color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)));
 
   @override
   void dispose() {
