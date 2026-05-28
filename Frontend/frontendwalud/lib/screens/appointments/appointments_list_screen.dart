@@ -7,6 +7,7 @@ import '../../models/user.dart';
 import '../../services/appointment_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/payment_service.dart';
+import '../../widgets/join_meeting_button.dart';
 import 'create_appointment_screen.dart';
 import 'appointment_detail_screen.dart';
 
@@ -32,40 +33,37 @@ class _AppointmentsListScreenState extends State<AppointmentsListScreen> {
   }
 
   Future<void> _init() async {
-  final r = await AuthService.getCurrentUser();
-  if (r['success'] && mounted) {
-    setState(() => _currentUser = r['user']);
+    final r = await AuthService.getCurrentUser();
+    if (r['success'] && mounted) {
+      setState(() => _currentUser = r['user']);
+    }
+    await _loadAppointments();
   }
-  // ✅ Solo cargar citas DESPUÉS de tener el usuario
-  await _loadAppointments();
-}
 
-Future<void> _loadAppointments() async {
-  setState(() => _isLoading = true);
-  final r = await AppointmentService.getAll();
+  Future<void> _loadAppointments() async {
+    setState(() => _isLoading = true);
+    final r = await AppointmentService.getAll();
 
-  // ✅ Verificar rol ANTES de llamar pagos
-  List<Payment> payments = [];
-  final esP = _currentUser?.isPatient == true;
-  
-  if (esP) {
-    final pagosR = await PaymentService.getAll(estadoPago: 'pendiente');
-    if (pagosR['success'] == true) {
-      payments = List<Payment>.from(pagosR['payments']);
+    List<Payment> payments = [];
+    final esP = _currentUser?.isPatient == true;
+
+    if (esP) {
+      final pagosR = await PaymentService.getAll(estadoPago: 'pendiente');
+      if (pagosR['success'] == true) {
+        payments = List<Payment>.from(pagosR['payments']);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _all       = r['success'] == true
+            ? List<Appointment>.from(r['appointments']) : [];
+        _payments  = esP ? payments : [];
+      });
     }
   }
 
-  if (mounted) {
-    setState(() {
-      _isLoading = false;
-      _all       = r['success'] == true
-          ? List<Appointment>.from(r['appointments']) : [];
-      _payments  = esP ? payments : [];
-    });
-  }
-}
-
-  // ✅ Verificar si una cita tiene pago pendiente
   bool _tienePagoPendiente(Appointment a) {
     return _payments.any((p) => p.appointmentId == a.id);
   }
@@ -97,24 +95,22 @@ Future<void> _loadAppointments() async {
   }
 
   void _openEdit(Appointment a) {
-  if (_currentUser?.isDoctor == true) {
-    // ✅ Médico → ver detalle y marcar como realizada
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => AppointmentDetailScreen(
-        appointment: a,
-        onChanged: _loadAppointments,
-      ),
-    ));
-  } else {
-    // ✅ Paciente → editar cita
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => CreateAppointmentScreen(
-        appointmentToEdit: a,
-        onCreated: _loadAppointments,
-      ),
-    ));
+    if (_currentUser?.isDoctor == true) {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => AppointmentDetailScreen(
+          appointment: a,
+          onChanged: _loadAppointments,
+        ),
+      ));
+    } else {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => CreateAppointmentScreen(
+          appointmentToEdit: a,
+          onCreated: _loadAppointments,
+        ),
+      ));
+    }
   }
-}
 
   void _irAPagos() {
     if (widget.onNavigate != null) {
@@ -131,17 +127,20 @@ Future<void> _loadAppointments() async {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(28),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Header
+
+          // ── Header
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Mis Citas', style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w900,
-                color: Color(0xFF1A1A7A))),
-              const SizedBox(height: 4),
-              Text('Gestiona y consulta el historial de tus consultas médicas.',
-                style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-            ])),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Mis Citas', style: TextStyle(
+                  fontSize: 28, fontWeight: FontWeight.w900,
+                  color: Color(0xFF1A1A7A))),
+                const SizedBox(height: 4),
+                Text('Gestiona y consulta el historial de tus consultas médicas.',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+              ],
+            )),
             if (_currentUser?.isPatient == true ||
                 _currentUser?.isDoctor == true)
               ElevatedButton.icon(
@@ -166,7 +165,7 @@ Future<void> _loadAppointments() async {
           ]),
           const SizedBox(height: 24),
 
-          // ✅ Banner pagos pendientes — solo pacientes
+          // ── Banner pagos pendientes — solo pacientes
           if (_currentUser?.isPatient == true && _payments.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(16),
@@ -180,18 +179,20 @@ Future<void> _loadAppointments() async {
                     color: Color(0xFFF59E0B), size: 24),
                 const SizedBox(width: 12),
                 Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(
-                    _payments.length == 1
-                        ? 'Tienes 1 cita con pago pendiente'
-                        : 'Tienes ${_payments.length} citas con pago pendiente',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF92400E), fontSize: 14,
-                    )),
-                  const Text('Realiza el pago para confirmar tu cita.',
-                    style: TextStyle(color: Color(0xFF92400E), fontSize: 12)),
-                ])),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _payments.length == 1
+                          ? 'Tienes 1 cita con pago pendiente'
+                          : 'Tienes ${_payments.length} citas con pago pendiente',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF92400E), fontSize: 14,
+                      )),
+                    const Text('Realiza el pago para confirmar tu cita.',
+                      style: TextStyle(color: Color(0xFF92400E), fontSize: 12)),
+                  ],
+                )),
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: _irAPagos,
@@ -211,13 +212,13 @@ Future<void> _loadAppointments() async {
             const SizedBox(height: 24),
           ],
 
-          // Próxima cita
+          // ── Próxima cita
           if (_nextAppointment != null) ...[
             _buildNextCard(_nextAppointment!),
             const SizedBox(height: 24),
           ],
 
-          // Tabla
+          // ── Tabla
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -228,6 +229,7 @@ Future<void> _loadAppointments() async {
               )],
             ),
             child: Column(children: [
+
               // Filtros
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -271,10 +273,10 @@ Future<void> _loadAppointments() async {
                   Expanded(flex: 2, child: _th('FECHA')),
                   Expanded(flex: 1, child: _th('HORA')),
                   Expanded(flex: 2, child: _th('ESTADO')),
-                  // ✅ Columna pago solo para pacientes
                   if (_currentUser?.isPatient == true)
                     Expanded(flex: 2, child: _th('PAGO')),
-                  const SizedBox(width: 40),
+                  // ── NUEVO: columna VIDEO en cabecera
+                  const SizedBox(width: 90),
                 ]),
               ),
               Divider(height: 1, color: Colors.grey.shade100),
@@ -314,9 +316,9 @@ Future<void> _loadAppointments() async {
   }
 
   Widget _buildNextCard(Appointment a) {
-    final now       = DateTime.now();
-    final diff      = a.dateTime.difference(now);
-    final isToday   = a.dateTime.day == now.day &&
+    final now        = DateTime.now();
+    final diff       = a.dateTime.difference(now);
+    final isToday    = a.dateTime.day == now.day &&
         a.dateTime.month == now.month;
     final isTomorrow = a.dateTime.day ==
         now.add(const Duration(days: 1)).day;
@@ -342,68 +344,83 @@ Future<void> _loadAppointments() async {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              const Icon(Icons.notifications_active,
-                  color: Colors.white70, size: 16),
-              const SizedBox(width: 6),
-              const Text('Siguiente Consulta',
-                style: TextStyle(color: Colors.white70, fontSize: 13)),
-            ]),
-            const SizedBox(height: 8),
-            Text(
-              _currentUser?.isDoctor == true
-                  ? 'Tu próxima consulta con ${a.patientName}${diff.inHours < 24 ? " es en menos de 24 horas." : "."}'
-                  : 'Tu próxima cita es con ${a.doctorName}${diff.inHours < 24 ? " en menos de 24 horas." : "."}',
-              style: const TextStyle(color: Colors.white, fontSize: 14)),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.notifications_active,
+                    color: Colors.white70, size: 16),
+                const SizedBox(width: 6),
+                const Text('Siguiente Consulta',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+              ]),
+              const SizedBox(height: 8),
+              Text(
+                _currentUser?.isDoctor == true
+                    ? 'Tu próxima consulta con ${a.patientName}'
+                      '${diff.inHours < 24 ? " es en menos de 24 horas." : "."}'
+                    : 'Tu próxima cita es con ${a.doctorName}'
+                      '${diff.inHours < 24 ? " en menos de 24 horas." : "."}',
+                style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
-              child: Row(children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('FECHA', style: TextStyle(
-                    color: Colors.white38, fontSize: 9, letterSpacing: 1)),
-                  Text(cuando, style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold,
-                    fontSize: 16)),
-                ]),
-                const SizedBox(width: 20),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('HORA', style: TextStyle(
-                    color: Colors.white38, fontSize: 9, letterSpacing: 1)),
-                  Text(DateFormat('hh:mm a').format(a.dateTime),
-                    style: const TextStyle(
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('FECHA', style: TextStyle(
+                      color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+                    Text(cuando, style: const TextStyle(
                       color: Colors.white, fontWeight: FontWeight.bold,
                       fontSize: 16)),
+                  ]),
+                  const SizedBox(width: 20),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('HORA', style: TextStyle(
+                      color: Colors.white38, fontSize: 9, letterSpacing: 1)),
+                    Text(DateFormat('hh:mm a').format(a.dateTime),
+                      style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold,
+                        fontSize: 16)),
+                  ]),
                 ]),
-              ]),
-            ),
-          ])),
-          const SizedBox(width: 16),
-          Column(children: [
-            if (a.status == AppointmentStatus.pendiente)
-              ElevatedButton(
-                onPressed: () => _openEdit(a),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF06B6D4),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Ver / Editar',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-          ]),
+            ],
+          )),
+          const SizedBox(width: 16),
+
+          // ── NUEVO: botón videollamada + Ver/Editar apilados
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              JoinMeetingButton(
+                appointment: a,
+                currentUser: _currentUser,
+              ),
+              const SizedBox(height: 8),
+              if (a.status == AppointmentStatus.pendiente)
+                ElevatedButton(
+                  onPressed: () => _openEdit(a),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF06B6D4),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Ver / Editar',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
         ]),
 
-        // ✅ Banner pago pendiente en la próxima cita
+        // ── Banner pago pendiente en la próxima cita
         if (tienePago && _currentUser?.isPatient == true) ...[
           const SizedBox(height: 12),
           Container(
@@ -446,8 +463,8 @@ Future<void> _loadAppointments() async {
   }
 
   Widget _buildRow(Appointment a, bool shaded) {
-    final statusColor   = Color(int.parse('0x${a.statusColor}'));
-    final tienePago     = _tienePagoPendiente(a);
+    final statusColor = Color(int.parse('0x${a.statusColor}'));
+    final tienePago   = _tienePagoPendiente(a);
 
     return InkWell(
       onTap: () => _showMenu(a),
@@ -464,16 +481,18 @@ Future<void> _loadAppointments() async {
             ),
             const SizedBox(width: 10),
             Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                _currentUser?.isDoctor == true
-                    ? a.patientName : a.doctorName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13,
-                  color: Color(0xFF4F46E5))),
-              Text('ID: #${a.id ?? "-"}',
-                style: TextStyle(fontSize: 10, color: Colors.grey[400])),
-            ])),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _currentUser?.isDoctor == true
+                      ? a.patientName : a.doctorName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 13,
+                    color: Color(0xFF4F46E5))),
+                Text('ID: #${a.id ?? "-"}',
+                  style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+              ],
+            )),
           ])),
           Expanded(flex: 2, child: Text(
             especialidadLabel(a.especialidad),
@@ -492,7 +511,8 @@ Future<void> _loadAppointments() async {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 6, height: 6,
+              Container(
+                width: 6, height: 6,
                 decoration: BoxDecoration(
                     color: statusColor, shape: BoxShape.circle)),
               const SizedBox(width: 5),
@@ -502,7 +522,7 @@ Future<void> _loadAppointments() async {
             ]),
           )),
 
-          // ✅ Botón pagar en la fila — solo pacientes
+          // Columna pago — solo pacientes
           if (_currentUser?.isPatient == true)
             Expanded(flex: 2, child: tienePago
                 ? GestureDetector(
@@ -516,11 +536,11 @@ Future<void> _loadAppointments() async {
                         border: Border.all(
                             color: const Color(0xFFF59E0B).withOpacity(0.5)),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.payment_outlined,
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.payment_outlined,
                             color: Color(0xFFF59E0B), size: 14),
-                        const SizedBox(width: 4),
-                        const Text('Pagar',
+                        SizedBox(width: 4),
+                        Text('Pagar',
                           style: TextStyle(
                             color: Color(0xFFF59E0B), fontSize: 11,
                             fontWeight: FontWeight.bold)),
@@ -528,6 +548,16 @@ Future<void> _loadAppointments() async {
                     ),
                   )
                 : const SizedBox()),
+
+          // ── NUEVO: botón compacto videollamada en la fila
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: JoinMeetingButton(
+              appointment: a,
+              currentUser: _currentUser,
+              compact: true,
+            ),
+          ),
 
           SizedBox(width: 40, child: IconButton(
             icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
@@ -555,7 +585,6 @@ Future<void> _loadAppointments() async {
           ),
           const SizedBox(height: 16),
 
-          // ✅ Opción pagar en el menú — solo pacientes con pago pendiente
           if (tienePago && _currentUser?.isPatient == true)
             ListTile(
               leading: const Icon(Icons.payment_outlined,
@@ -571,25 +600,27 @@ Future<void> _loadAppointments() async {
             ),
 
           if (a.status == AppointmentStatus.pendiente &&
-    _currentUser?.isPatient == true)
-  ListTile(
-    leading: const Icon(Icons.edit_outlined, color: Colors.orange),
-    title: const Text('Editar cita'),
-    onTap: () {
-      Navigator.pop(context);
-      _openEdit(a);
-    },
-  ),
-if (_currentUser?.isDoctor == true)
-  ListTile(
-    leading: const Icon(Icons.visibility_outlined,
-        color: Color(0xFF4F46E5)),
-    title: const Text('Ver detalle'),
-    onTap: () {
-      Navigator.pop(context);
-      _openEdit(a);
-    },
-  ),
+              _currentUser?.isPatient == true)
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: Colors.orange),
+              title: const Text('Editar cita'),
+              onTap: () {
+                Navigator.pop(context);
+                _openEdit(a);
+              },
+            ),
+
+          if (_currentUser?.isDoctor == true)
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined,
+                  color: Color(0xFF4F46E5)),
+              title: const Text('Ver detalle'),
+              onTap: () {
+                Navigator.pop(context);
+                _openEdit(a);
+              },
+            ),
+
           if (_currentUser?.isPatient == true)
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),

@@ -11,6 +11,7 @@ import '../../models/user.dart';
 import '../../services/appointment_service.dart';
 import '../../services/auth_service.dart';
 import '../../config/api_config.dart';
+import '../../widgets/join_meeting_button.dart';
 
 // ── Helper inline de selección de archivos (Web + Móvil)
 class _PickedFile {
@@ -88,14 +89,14 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _appt         = widget.appointment;
-    _isEditing    = widget.editMode && (_isPending);
+    _appt             = widget.appointment;
+    _isEditing        = widget.editMode && (_isPending);
     _reasonController = TextEditingController(text: _appt.reason);
     _notesController  = TextEditingController(text: _appt.notes ?? '');
     _editDate         = _appt.dateTime;
     _editTime         = TimeOfDay.fromDateTime(_appt.dateTime);
     _editEspecialidad = _appt.especialidad;
-    _editStatus       = AppointmentStatus.realizada; // médico solo puede poner realizada
+    _editStatus       = AppointmentStatus.realizada;
     _loadUser();
   }
 
@@ -109,7 +110,6 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     Map<String, dynamic> result;
 
     if (_isDoc) {
-      // ✅ Médico solo puede marcar como realizada
       result = await AppointmentService.updateStatus(_appt.id!, AppointmentStatus.realizada);
     } else {
       final dt = DateTime(
@@ -127,7 +127,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         appointmentType: _appt.appointmentType,
         dateTime:        dt,
         reason:          _reasonController.text.trim(),
-        notes:           _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+        notes:           _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim() : null,
       );
       result = await AppointmentService.updatePatient(_appt.id!, updated);
     }
@@ -140,11 +141,17 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         setState(() => _isEditing = false);
         widget.onChanged?.call();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Cita actualizada'), backgroundColor: Color(0xFF10B981)),
+          const SnackBar(
+            content: Text('✅ Cita actualizada'),
+            backgroundColor: Color(0xFF10B981),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Error'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(result['message'] ?? 'Error'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -184,37 +191,35 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         ));
         widget.onChanged?.call();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Archivo adjuntado correctamente'), backgroundColor: Color(0xFF10B981)),
+          const SnackBar(
+            content: Text('✅ Archivo adjuntado correctamente'),
+            backgroundColor: Color(0xFF10B981),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(r['message'] ?? 'Error al subir'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(r['message'] ?? 'Error al subir'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
-  // ✅ Abrir/descargar el archivo adjunto
   Future<void> _viewAttachment() async {
     if (_appt.attachmentPath == null && _appt.attachmentName == null) return;
 
-    // ✅ Base del servidor Laravel — ajusta si cambias de servidor
     final serverBase = ApiConfig.baseUrl.replaceAll('/api/', '');
-
     String url = _appt.attachmentPath ?? '';
 
-    // Casos posibles que devuelve Laravel:
-    // 1. Ya es URL completa:  "http://127.0.0.1:8000/storage/appointments/..."
-    // 2. Ruta con /storage:   "/storage/appointments/attachments/archivo.pdf"
-    // 3. Ruta interna:        "appointments/attachments/archivo.pdf"
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      // Ya es URL completa — usar tal cual
+      // ya es URL completa
     } else if (url.startsWith('/storage/')) {
       url = '$serverBase$url';
     } else if (url.startsWith('storage/')) {
       url = '$serverBase/$url';
     } else {
-      // Ruta interna del disco public: "appointments/attachments/archivo.pdf"
       url = '$serverBase/storage/$url';
     }
 
@@ -222,7 +227,6 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
 
     try {
       if (kIsWeb) {
-        // ✅ En Flutter Web usar dart:html directamente — evita restricciones de url_launcher
         html.window.open(url, '_blank');
       } else {
         if (await canLaunchUrl(uri)) {
@@ -259,18 +263,17 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
-          // ✅ Médico: solo si pendiente, botón para marcar realizada
           if (!_isEditing && _isPending && _isDoc)
             TextButton(
               onPressed: () => setState(() => _isEditing = true),
               child: const Text('Marcar Realizada',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
-          // ✅ Paciente: solo si pendiente Y dentro de las 12 horas
           if (!_isEditing && _canPatientEdit && _isPatient)
             TextButton(
               onPressed: () => setState(() => _isEditing = true),
-              child: const Text('Editar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text('Editar',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           if (_isEditing)
             TextButton(
@@ -293,14 +296,32 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                 border: Border.all(color: statusColor.withOpacity(0.3)),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: 10, height: 10,
-                    decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                Container(
+                  width: 10, height: 10,
+                  decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                ),
                 const SizedBox(width: 8),
                 Text(_appt.statusLabel,
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 15)),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    )),
               ]),
             ),
           ),
+
+          // ── NUEVO: Botón videollamada — visible solo si la cita es pendiente
+          if (_isPending) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: JoinMeetingButton(
+                appointment: _appt,
+                currentUser: _currentUser,
+              ),
+            ),
+          ],
 
           // ── Banner informativo según estado
           if (!_isPending) ...[
@@ -354,7 +375,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
             if (_isEditing && _isPatient)
               _especialidadDropdown()
             else
-              _infoRow(Icons.medical_services, 'Especialidad', especialidadLabel(_appt.especialidad)),
+              _infoRow(Icons.medical_services, 'Especialidad',
+                  especialidadLabel(_appt.especialidad)),
             if (_isDoc) ...[
               const SizedBox(height: 10),
               _infoRow(Icons.person_outline, 'Paciente', _appt.patientName),
@@ -378,7 +400,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
               _infoRow(Icons.calendar_today, 'Fecha programada',
                 DateFormat('EEEE, d MMMM yyyy', 'es').format(_appt.dateTime)),
               const SizedBox(height: 10),
-              _infoRow(Icons.schedule, 'Hora', DateFormat('hh:mm a').format(_appt.dateTime)),
+              _infoRow(Icons.schedule, 'Hora',
+                DateFormat('hh:mm a').format(_appt.dateTime)),
             ],
           ])),
 
@@ -389,7 +412,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
             _infoRow(Icons.category_outlined, 'Tipo', _appt.appointmentType),
             const Divider(height: 20),
             if (_isEditing && _isPatient) ...[
-              const Text('Motivo *', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+              const Text('Motivo *',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF374151))),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _reasonController,
@@ -403,7 +427,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
               _infoRow(Icons.note_alt_outlined, 'Motivo', _appt.reason),
             const Divider(height: 20),
             if (_isEditing && _isPatient) ...[
-              const Text('Notas adicionales', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+              const Text('Notas adicionales',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF374151))),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _notesController,
@@ -431,13 +456,21 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                   border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
                 ),
                 child: Row(children: [
-                  const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 22),
+                  const Icon(Icons.check_circle_outline,
+                      color: Color(0xFF10B981), size: 22),
                   const SizedBox(width: 12),
-                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Marcar como Realizada', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                    Text('Confirma que la consulta fue completada exitosamente.',
-                        style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  ])),
+                  const Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Marcar como Realizada',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF10B981),
+                          )),
+                      Text('Confirma que la consulta fue completada exitosamente.',
+                          style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  )),
                 ]),
               ),
             ])),
@@ -448,13 +481,13 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
             const SizedBox(height: 12),
 
             if (_appt.attachmentName != null) ...[
-              // ✅ Tarjeta del archivo con botón VER
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFF4F46E5).withOpacity(0.06),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.2)),
+                  border: Border.all(
+                      color: const Color(0xFF4F46E5).withOpacity(0.2)),
                 ),
                 child: Row(children: [
                   Container(
@@ -463,45 +496,56 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                       color: const Color(0xFF4F46E5).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.description_outlined, color: Color(0xFF4F46E5), size: 20),
+                    child: const Icon(Icons.description_outlined,
+                        color: Color(0xFF4F46E5), size: 20),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(_appt.attachmentName!,
-                      style: const TextStyle(color: Color(0xFF1A1A7A), fontWeight: FontWeight.w600, fontSize: 13),
-                      overflow: TextOverflow.ellipsis),
-                    const Text('Archivo adjunto por el paciente',
-                      style: TextStyle(color: Colors.grey, fontSize: 11)),
-                  ])),
-                  // ✅ Botón VER — disponible para médico Y paciente
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_appt.attachmentName!,
+                        style: const TextStyle(
+                          color: Color(0xFF1A1A7A),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis),
+                      const Text('Archivo adjunto por el paciente',
+                        style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    ],
+                  )),
                   TextButton.icon(
                     onPressed: _viewAttachment,
                     icon: const Icon(Icons.open_in_new, size: 16),
                     label: const Text('Ver', style: TextStyle(fontSize: 13)),
-                    style: TextButton.styleFrom(foregroundColor: const Color(0xFF4F46E5)),
+                    style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4F46E5)),
                   ),
                 ]),
               ),
               const SizedBox(height: 10),
             ],
 
-            // ✅ Botón adjuntar: SOLO paciente
             if (_isPatient) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: _isUploading ? null : _pickAndUploadFile,
                   icon: _isUploading
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(_appt.attachmentName != null ? Icons.refresh : Icons.upload_file),
+                      ? const SizedBox(width: 16, height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(_appt.attachmentName != null
+                          ? Icons.refresh : Icons.upload_file),
                   label: Text(_isUploading
                       ? 'Subiendo...'
-                      : (_appt.attachmentName != null ? 'Reemplazar archivo' : 'Adjuntar archivo')),
+                      : (_appt.attachmentName != null
+                          ? 'Reemplazar archivo' : 'Adjuntar archivo')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF4F46E5),
                     side: const BorderSide(color: Color(0xFF4F46E5)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
@@ -530,14 +574,19 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                   backgroundColor: const Color(0xFF4F46E5),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 child: _isSaving
                     ? const SizedBox(width: 20, height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
                     : Text(
-                        _isDoc ? 'Confirmar Consulta Realizada' : 'Guardar cambios',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        _isDoc
+                            ? 'Confirmar Consulta Realizada'
+                            : 'Guardar cambios',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
               ),
             ),
@@ -557,7 +606,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.amber.shade200),
-        boxShadow: [BoxShadow(color: Colors.amber.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(
+          color: Colors.amber.withOpacity(0.08),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        )],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -567,12 +620,15 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
               color: Colors.amber.shade50,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.policy_outlined, color: Colors.amber.shade700, size: 20),
+            child: Icon(Icons.policy_outlined,
+                color: Colors.amber.shade700, size: 20),
           ),
           const SizedBox(width: 10),
           Text('Política de Modificación',
             style: TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber.shade800,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.amber.shade800,
             )),
         ]),
         const SizedBox(height: 12),
@@ -611,18 +667,18 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     );
   }
 
-  Widget _termRow(IconData icon, String title, String desc) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
+  Widget _termRow(IconData icon, String title, String desc) =>
+    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, size: 16, color: Colors.grey[400]),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF374151))),
+        Text(title, style: const TextStyle(
+          fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF374151))),
         const SizedBox(height: 2),
-        Text(desc, style: TextStyle(fontSize: 11, color: Colors.grey[500], height: 1.4)),
+        Text(desc, style: TextStyle(
+          fontSize: 11, color: Colors.grey[500], height: 1.4)),
       ])),
-    ],
-  );
+    ]);
 
   // ── Helpers UI
   Widget _card({required Widget child}) => Container(
@@ -630,16 +686,27 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     margin: const EdgeInsets.only(bottom: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white, borderRadius: BorderRadius.circular(16),
-      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [BoxShadow(
+        color: Colors.black.withOpacity(0.04),
+        blurRadius: 8,
+        offset: const Offset(0, 2),
+      )],
     ),
     child: child,
   );
 
   Widget _sectionTitle(String t) => Text(t,
-    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5), letterSpacing: 0.5));
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.bold,
+      color: Color(0xFF4F46E5),
+      letterSpacing: 0.5,
+    ));
 
-  Widget _infoRow(IconData icon, String label, String value, {bool isBlue = false}) =>
+  Widget _infoRow(IconData icon, String label, String value,
+      {bool isBlue = false}) =>
     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, size: 18, color: Colors.grey[400]),
       const SizedBox(width: 10),
@@ -668,7 +735,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   Widget _editableDateRow() => InkWell(
     onTap: () async {
       final d = await showDatePicker(
-        context: context, initialDate: _editDate!,
+        context: context,
+        initialDate: _editDate!,
         firstDate: DateTime.now(),
         lastDate: DateTime.now().add(const Duration(days: 60)),
       );
@@ -688,7 +756,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
 
   Widget _editableTimeRow() => InkWell(
     onTap: () async {
-      final t = await showTimePicker(context: context, initialTime: _editTime!);
+      final t = await showTimePicker(
+          context: context, initialTime: _editTime!);
       if (t != null) setState(() => _editTime = t);
     },
     child: InputDecorator(
@@ -698,7 +767,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
-      child: Text(_editTime!.format(context), style: const TextStyle(fontWeight: FontWeight.w500)),
+      child: Text(_editTime!.format(context),
+        style: const TextStyle(fontWeight: FontWeight.w500)),
     ),
   );
 

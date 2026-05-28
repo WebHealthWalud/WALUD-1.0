@@ -10,6 +10,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PatientProfileController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\JitsiController;
 
 // ── Públicas
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -97,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/appointments/{id}/attachment', [AppointmentController::class, 'uploadAttachment']);
     Route::apiResource('appointments', AppointmentController::class);
 
+    Route::get('/appointments/{id}/jitsi-token', [JitsiController::class, 'getToken']);
     // ── Pagos
     Route::get('/payments/summary', [PaymentController::class, 'summary']);
     Route::post('/payments/{id}/pay', [PaymentController::class, 'pay']);
