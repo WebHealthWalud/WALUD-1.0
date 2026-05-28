@@ -10,6 +10,7 @@ import '../../models/appointment.dart';
 import '../../models/user.dart';
 import '../../services/appointment_service.dart';
 import '../../services/auth_service.dart';
+import '../../config/api_config.dart';
 
 // ── Helper inline de selección de archivos (Web + Móvil)
 class _PickedFile {
@@ -198,7 +199,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     if (_appt.attachmentPath == null && _appt.attachmentName == null) return;
 
     // ✅ Base del servidor Laravel — ajusta si cambias de servidor
-    const serverBase = 'http://127.0.0.1:8000';
+    final serverBase = ApiConfig.baseUrl.replaceAll('/api/', '');
 
     String url = _appt.attachmentPath ?? '';
 

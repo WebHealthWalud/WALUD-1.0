@@ -8,6 +8,7 @@ import '../../services/appointment_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/payment_service.dart';
 import 'create_appointment_screen.dart';
+import 'appointment_detail_screen.dart';
 
 class AppointmentsListScreen extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -96,6 +97,16 @@ Future<void> _loadAppointments() async {
   }
 
   void _openEdit(Appointment a) {
+  if (_currentUser?.isDoctor == true) {
+    // ✅ Médico → ver detalle y marcar como realizada
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => AppointmentDetailScreen(
+        appointment: a,
+        onChanged: _loadAppointments,
+      ),
+    ));
+  } else {
+    // ✅ Paciente → editar cita
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => CreateAppointmentScreen(
         appointmentToEdit: a,
@@ -103,6 +114,7 @@ Future<void> _loadAppointments() async {
       ),
     ));
   }
+}
 
   void _irAPagos() {
     if (widget.onNavigate != null) {
@@ -559,16 +571,25 @@ Future<void> _loadAppointments() async {
             ),
 
           if (a.status == AppointmentStatus.pendiente &&
-              (_currentUser?.isPatient == true ||
-                  _currentUser?.isDoctor == true))
-            ListTile(
-              leading: const Icon(Icons.edit_outlined, color: Colors.orange),
-              title: const Text('Editar cita'),
-              onTap: () {
-                Navigator.pop(context);
-                _openEdit(a);
-              },
-            ),
+    _currentUser?.isPatient == true)
+  ListTile(
+    leading: const Icon(Icons.edit_outlined, color: Colors.orange),
+    title: const Text('Editar cita'),
+    onTap: () {
+      Navigator.pop(context);
+      _openEdit(a);
+    },
+  ),
+if (_currentUser?.isDoctor == true)
+  ListTile(
+    leading: const Icon(Icons.visibility_outlined,
+        color: Color(0xFF4F46E5)),
+    title: const Text('Ver detalle'),
+    onTap: () {
+      Navigator.pop(context);
+      _openEdit(a);
+    },
+  ),
           if (_currentUser?.isPatient == true)
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
