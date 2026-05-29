@@ -11,6 +11,7 @@ use App\Http\Controllers\PatientProfileController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\JitsiController;
+use App\Http\Controllers\MedicalRecordController;
 
 // ── Públicas
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -97,6 +98,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/appointments/available-slots', [AppointmentController::class, 'availableSlots']);
     Route::post('/appointments/{id}/attachment', [AppointmentController::class, 'uploadAttachment']);
     Route::apiResource('appointments', AppointmentController::class);
+
+     // ── Historias Clínicas / Evoluciones Médicas
+    Route::get('/medical-records/search-patient', [MedicalRecordController::class, 'searchPatient']);
+    Route::get('/medical-records/timeline/{patientId}', [MedicalRecordController::class, 'timeline']);
+    Route::apiResource('medical-records', MedicalRecordController::class);
 
     Route::get('/appointments/{id}/jitsi-token', [JitsiController::class, 'getToken']);
     // ── Pagos
