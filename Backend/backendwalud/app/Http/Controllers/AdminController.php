@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Appointment;
 use App\Models\Payment;
+use App\Models\MedicalRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -33,7 +34,6 @@ class AdminController extends Controller
         ]);
     }
 
-    // Listar usuarios — filtro por rol funciona correctamente
     public function indexUsers(Request $request)
     {
         if ($deny = $this->checkAdmin($request)) return $deny;
@@ -127,7 +127,16 @@ class AdminController extends Controller
             'alergias'     => 'nullable|string',
             'especialidad' => 'nullable|string',
             'is_active'    => 'sometimes|boolean',
+            // ✅ El rol también puede actualizarse desde el formulario de edición
+            'rol'          => 'sometimes|in:paciente,medico,admin',
         ]);
+
+        // Si viene cambio de rol, sincronizarlo
+        if (isset($validated['rol'])) {
+            $user->syncRoles([$validated['rol']]);
+            $user->tipo_usuario = $validated['rol'];
+            unset($validated['rol']);
+        }
 
         $user->update($validated);
 
@@ -183,7 +192,6 @@ class AdminController extends Controller
         return response()->json(['message' => 'Usuario eliminado correctamente']);
     }
 
-    // Citas con búsqueda por documento del paciente
     public function indexAppointments(Request $request)
     {
         if ($deny = $this->checkAdmin($request)) return $deny;
@@ -196,8 +204,6 @@ class AdminController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-
-        // Búsqueda por documento o nombre del paciente
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
@@ -240,12 +246,89 @@ class AdminController extends Controller
         if ($deny = $this->checkAdmin($request)) return $deny;
 
         return response()->json([
-            'total_completado' => Payment::where('estado_pago', 'completado')->sum('monto'),
-            'total_pendiente'  => Payment::where('estado_pago', 'pendiente')->sum('monto'),
-            'total_cancelado'  => Payment::where('estado_pago', 'cancelado')->sum('monto'),
+            'total_completado' => (float) Payment::where('estado_pago', 'completado')->sum('monto'),
+            'total_pendiente'  => (float) Payment::where('estado_pago', 'pendiente')->sum('monto'),
+            'total_cancelado'  => (float) Payment::where('estado_pago', 'cancelado')->sum('monto'),
             'count_completado' => Payment::where('estado_pago', 'completado')->count(),
             'count_pendiente'  => Payment::where('estado_pago', 'pendiente')->count(),
             'count_cancelado'  => Payment::where('estado_pago', 'cancelado')->count(),
+        ]);
+    }
+
+    // ✅ NUEVO: Historial clínico para el administrador
+    public function indexMedicalRecords(Request $request)
+    {
+        if ($deny = $this->checkAdmin($request)) return $deny;
+
+        $query = MedicalRecord::with([
+            'patient:id,name,last_name,document,tipo_documento,birth_date,tipo_sangre,alergias',
+            'doctor:id,name,last_name,especialidad',
+        ]);
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $patientIds = User::where(function ($q) use ($s) {
+                $q->where('document',  'like', "%$s%")
+                  ->orWhere('name',     'like', "%$s%")
+                  ->orWhere('last_name','like', "%$s%")
+                  ->orWhereRaw("CONCAT(name, ' ', last_name) LIKE ?", ["%$s%"]);
+            })->pluck('id');
+
+            $query->whereIn('patient_id', $patientIds);
+        }
+
+        if ($request->filled('especialidad')) {
+            $query->where('especialidad', $request->especialidad);
+        }
+
+        return response()->json($query->orderBy('created_at', 'desc')->paginate(20));
+    }
+
+    // ✅ NUEVO: Ver un registro médico específico
+    public function showMedicalRecord(Request $request, $id)
+    {
+        if ($deny = $this->checkAdmin($request)) return $deny;
+
+        $record = MedicalRecord::with([
+            'patient:id,name,last_name,document,tipo_documento,birth_date,tipo_sangre,alergias,phone,email',
+            'doctor:id,name,last_name,especialidad,phone,email',
+            'appointment:id,date,time,especialidad',
+        ])->findOrFail($id);
+
+        return response()->json($record);
+    }
+
+    // ✅ NUEVO: Editar un registro médico (admin puede editar cualquiera)
+    public function updateMedicalRecord(Request $request, $id)
+    {
+        if ($deny = $this->checkAdmin($request)) return $deny;
+
+        $record    = MedicalRecord::findOrFail($id);
+        $validated = $request->validate([
+            'motivo_consulta'         => 'sometimes|string',
+            'examen_fisico'           => 'nullable|string',
+            'diagnostico_cie10'       => 'nullable|string|max:20',
+            'diagnostico_nombre'      => 'nullable|string|max:255',
+            'diagnostico_descripcion' => 'nullable|string',
+            'tratamiento'             => 'nullable|string',
+            'observaciones'           => 'nullable|string',
+            'presion_sistolica'       => 'nullable|numeric',
+            'presion_diastolica'      => 'nullable|numeric',
+            'frecuencia_cardiaca'     => 'nullable|numeric',
+            'temperatura'             => 'nullable|numeric',
+            'peso'                    => 'nullable|numeric',
+            'talla'                   => 'nullable|numeric',
+            'saturacion_oxigeno'      => 'nullable|numeric',
+        ]);
+
+        $record->update($validated);
+
+        return response()->json([
+            'message' => 'Evolución actualizada correctamente',
+            'data'    => $record->fresh([
+                'patient:id,name,last_name',
+                'doctor:id,name,last_name,especialidad',
+            ]),
         ]);
     }
 }

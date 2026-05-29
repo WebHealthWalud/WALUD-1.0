@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../models/user.dart';
 import 'api_service.dart';
+import '../models/medical_record.dart';
 
 class AdminService {
   static const _base = 'admin';
@@ -203,6 +204,42 @@ class AdminService {
       return {'success': false, 'message': 'Error al obtener stats'};
     } catch (e) {
       return {'success': false, 'message': 'Error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMedicalRecords({
+    String? search,
+    int page = 1,
+  }) async {
+    try {
+      var ep = '$_base/medical-records?page=$page';
+
+      if (search != null && search.isNotEmpty) {
+        ep += '&search=${Uri.encodeComponent(search)}';
+      }
+
+      final r = await ApiService.getAuth(ep);
+
+      if (r.statusCode == 200) {
+        final data = jsonDecode(r.body);
+
+        return {
+          'success': true,
+          'records': (data['data'] as List)
+              .map((e) => MedicalRecord.fromJson(e))
+              .toList(),
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Error al obtener historial clínico',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error: $e',
+      };
     }
   }
 }
