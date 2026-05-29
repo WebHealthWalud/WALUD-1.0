@@ -395,6 +395,48 @@ if (result['success'] == true) {
                         : 'Encuentra al especialista adecuado y reserva tu espacio en segundos.',
                     style: TextStyle(color: Colors.grey[500], fontSize: 14),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Fecha y Hora
+                  _section(
+                    icon:  Icons.calendar_month_outlined,
+                    title: 'Fecha y Hora',
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildCalendar()),
+                        const SizedBox(width: 24),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Horarios Disponibles', style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13, color: Color(0xFF374151),
+                            )),
+                            const SizedBox(height: 12),
+                            if (_selectedDoctorId == null)
+                              Text('Selecciona especialidad y médico primero',
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 12))
+                            else
+                              ..._buildSlotGrid(),
+                            if (_selectedDoctorId != null) ...[
+                              const SizedBox(height: 12),
+                              Row(children: [
+                                const Icon(Icons.info_outline,
+                                    size: 13, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text('Duración estimada: 45 minutos.',
+                                  style: TextStyle(
+                                      color: Colors.grey[500], fontSize: 11)),
+                              ]),
+                            ],
+                          ],
+                        )),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 24),
 
                   // ── Información médica
@@ -564,47 +606,7 @@ if (result['success'] == true) {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-
-                  // ── Fecha y Hora
-                  _section(
-                    icon:  Icons.calendar_month_outlined,
-                    title: 'Fecha y Hora',
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildCalendar()),
-                        const SizedBox(width: 24),
-                        Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Horarios Disponibles', style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13, color: Color(0xFF374151),
-                            )),
-                            const SizedBox(height: 12),
-                            if (_selectedDoctorId == null)
-                              Text('Selecciona especialidad y médico primero',
-                                style: TextStyle(
-                                    color: Colors.grey[400], fontSize: 12))
-                            else
-                              ..._buildSlotGrid(),
-                            if (_selectedDoctorId != null) ...[
-                              const SizedBox(height: 12),
-                              Row(children: [
-                                const Icon(Icons.info_outline,
-                                    size: 13, color: Colors.grey),
-                                const SizedBox(width: 4),
-                                Text('Duración estimada: 45 minutos.',
-                                  style: TextStyle(
-                                      color: Colors.grey[500], fontSize: 11)),
-                              ]),
-                            ],
-                          ],
-                        )),
-                      ],
-                    ),
-                  ),
+                  
                   const SizedBox(height: 20),
 
                   // ── Detalles
