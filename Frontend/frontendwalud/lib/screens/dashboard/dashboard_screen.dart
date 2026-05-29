@@ -60,7 +60,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (_currentUser?.isPatient == true) {
       items.add(const _NavItem(icon: Icons.payment_outlined,     label: 'Pagos'));
-      items.add(const _NavItem(icon: Icons.headset_mic_outlined, label: 'Soporte'));
     }
     items.add(const _NavItem(icon: Icons.person_outline, label: 'Perfil'));
     return items;
@@ -82,7 +81,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // ✅ Índice 2 → Historial clínico real (ya no es placeholder)
     if (idx == 2) return const MedicalHistoryScreen();
     if (idx == _pagosIndex)     return const PaymentsScreen();
-    if (idx == _soporteIndex)   return const _SoporteTab();
     if (idx == _pacientesIndex) return const PatientsScreen();
     if (idx == _perfilIndex) {
       if (_currentUser?.isDoctor == true) return const DoctorProfileScreen();
@@ -683,19 +681,3 @@ class _QuickCard extends StatelessWidget {
   );
 }
 
-class _SoporteTab extends StatelessWidget {
-  const _SoporteTab();
-  @override
-  Widget build(BuildContext context) => const Center(
-    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(Icons.headset_mic, size: 80, color: Color(0xFF4F46E5)),
-      SizedBox(height: 16),
-      Text('Soporte', style: TextStyle(
-          fontSize: 20, fontWeight: FontWeight.bold,
-          color: Color(0xFF1A1A7A))),
-      SizedBox(height: 8),
-      Text('Próximamente disponible',
-          style: TextStyle(color: Colors.grey)),
-    ]),
-  );
-}
