@@ -1,6 +1,5 @@
 <?php
 namespace App\Http\Controllers;
-
 use App\Models\User;
 use App\Models\Appointment;
 use App\Models\Payment;
@@ -18,6 +17,7 @@ class AdminController extends Controller
         return null;
     }
 
+    // ✅ FIX: se agrega total_historias para evitar una segunda llamada desde Flutter
     public function stats(Request $request)
     {
         if ($deny = $this->checkAdmin($request)) return $deny;
@@ -31,6 +31,8 @@ class AdminController extends Controller
             'citas_pendientes'      => Appointment::where('status', 'pendiente')->count(),
             'citas_realizadas'      => Appointment::where('status', 'realizada')->count(),
             'ingresos_totales'      => Payment::where('estado_pago', 'completado')->sum('monto'),
+            // ✅ NUEVO: total de historias clínicas en un solo endpoint
+            'total_historias'       => MedicalRecord::count(),
         ]);
     }
 
@@ -49,8 +51,8 @@ class AdminController extends Controller
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
-                $q->where('name',      'like', "%$s%")
-                  ->orWhere('last_name','like', "%$s%")
+                $q->where('name',     'like', "%$s%")
+                  ->orWhere('last_name', 'like', "%$s%")
                   ->orWhere('email',   'like', "%$s%")
                   ->orWhere('document','like', "%$s%");
             });
@@ -95,12 +97,12 @@ class AdminController extends Controller
             'password'       => Hash::make($validated['password']),
             'tipo_usuario'   => $validated['rol'],
             'birth_date'     => $validated['birth_date']  ?? null,
-            'phone'          => $validated['phone']        ?? null,
-            'genero'         => $validated['genero']       ?? null,
-            'tipo_sangre'    => $validated['tipo_sangre']  ?? null,
-            'alergias'       => $validated['alergias']     ?? null,
-            'especialidad'   => $validated['especialidad'] ?? null,
-            'is_active'      => $validated['is_active']    ?? true,
+            'phone'          => $validated['phone']       ?? null,
+            'genero'         => $validated['genero']      ?? null,
+            'tipo_sangre'    => $validated['tipo_sangre'] ?? null,
+            'alergias'       => $validated['alergias']    ?? null,
+            'especialidad'   => $validated['especialidad']?? null,
+            'is_active'      => $validated['is_active']   ?? true,
         ]);
 
         $user->assignRole($validated['rol']);
@@ -127,11 +129,9 @@ class AdminController extends Controller
             'alergias'     => 'nullable|string',
             'especialidad' => 'nullable|string',
             'is_active'    => 'sometimes|boolean',
-            // ✅ El rol también puede actualizarse desde el formulario de edición
             'rol'          => 'sometimes|in:paciente,medico,admin',
         ]);
 
-        // Si viene cambio de rol, sincronizarlo
         if (isset($validated['rol'])) {
             $user->syncRoles([$validated['rol']]);
             $user->tipo_usuario = $validated['rol'];
@@ -255,7 +255,7 @@ class AdminController extends Controller
         ]);
     }
 
-    // ✅ NUEVO: Historial clínico para el administrador
+    // ── Historial clínico para el administrador
     public function indexMedicalRecords(Request $request)
     {
         if ($deny = $this->checkAdmin($request)) return $deny;
@@ -266,14 +266,13 @@ class AdminController extends Controller
         ]);
 
         if ($request->filled('search')) {
-            $s = $request->search;
+            $s          = $request->search;
             $patientIds = User::where(function ($q) use ($s) {
                 $q->where('document',  'like', "%$s%")
                   ->orWhere('name',     'like', "%$s%")
                   ->orWhere('last_name','like', "%$s%")
                   ->orWhereRaw("CONCAT(name, ' ', last_name) LIKE ?", ["%$s%"]);
             })->pluck('id');
-
             $query->whereIn('patient_id', $patientIds);
         }
 
@@ -284,7 +283,6 @@ class AdminController extends Controller
         return response()->json($query->orderBy('created_at', 'desc')->paginate(20));
     }
 
-    // ✅ NUEVO: Ver un registro médico específico
     public function showMedicalRecord(Request $request, $id)
     {
         if ($deny = $this->checkAdmin($request)) return $deny;
@@ -298,27 +296,26 @@ class AdminController extends Controller
         return response()->json($record);
     }
 
-    // ✅ NUEVO: Editar un registro médico (admin puede editar cualquiera)
     public function updateMedicalRecord(Request $request, $id)
     {
         if ($deny = $this->checkAdmin($request)) return $deny;
 
         $record    = MedicalRecord::findOrFail($id);
         $validated = $request->validate([
-            'motivo_consulta'         => 'sometimes|string',
-            'examen_fisico'           => 'nullable|string',
-            'diagnostico_cie10'       => 'nullable|string|max:20',
-            'diagnostico_nombre'      => 'nullable|string|max:255',
-            'diagnostico_descripcion' => 'nullable|string',
-            'tratamiento'             => 'nullable|string',
-            'observaciones'           => 'nullable|string',
-            'presion_sistolica'       => 'nullable|numeric',
-            'presion_diastolica'      => 'nullable|numeric',
-            'frecuencia_cardiaca'     => 'nullable|numeric',
-            'temperatura'             => 'nullable|numeric',
-            'peso'                    => 'nullable|numeric',
-            'talla'                   => 'nullable|numeric',
-            'saturacion_oxigeno'      => 'nullable|numeric',
+            'motivo_consulta'          => 'sometimes|string',
+            'examen_fisico'            => 'nullable|string',
+            'diagnostico_cie10'        => 'nullable|string|max:20',
+            'diagnostico_nombre'       => 'nullable|string|max:255',
+            'diagnostico_descripcion'  => 'nullable|string',
+            'tratamiento'              => 'nullable|string',
+            'observaciones'            => 'nullable|string',
+            'presion_sistolica'        => 'nullable|numeric',
+            'presion_diastolica'       => 'nullable|numeric',
+            'frecuencia_cardiaca'      => 'nullable|numeric',
+            'temperatura'              => 'nullable|numeric',
+            'peso'                     => 'nullable|numeric',
+            'talla'                    => 'nullable|numeric',
+            'saturacion_oxigeno'       => 'nullable|numeric',
         ]);
 
         $record->update($validated);

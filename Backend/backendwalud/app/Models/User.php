@@ -39,40 +39,46 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    // ✅ FIX ROL: forzar que tipo_from_role se incluya SIEMPRE en toArray()/toJson()
+    // Sin esto, el accessor existe pero nunca aparece en la respuesta JSON
+    // a menos que se agregue manualmente (como hacíamos en AuthController).
+    // Con $appends, se incluye automáticamente en TODAS las respuestas.
+    protected $appends = ['tipo_from_role'];
+
     protected function casts(): array
     {
         return [
-            'email_verified_at'     => 'datetime',
-            'phone_verified_at'     => 'datetime',
-            'password'              => 'hashed',
-            'notificaciones_email'  => 'boolean',
-            'notificaciones_sms'    => 'boolean',
-            'is_active'             => 'boolean',
+            'email_verified_at'    => 'datetime',
+            'phone_verified_at'    => 'datetime',
+            'password'             => 'hashed',
+            'notificaciones_email' => 'boolean',
+            'notificaciones_sms'   => 'boolean',
+            'is_active'            => 'boolean',
         ];
     }
 
-    // Helper: determinar tipo desde rol Spatie
+    // ✅ Determina el rol real desde Spatie (no desde tipo_usuario de la BD)
+    // Este accessor ahora se incluye automáticamente gracias a $appends.
+    // Flutter debe leer 'tipo_from_role' en lugar de 'tipo_usuario'.
     public function getTipoFromRoleAttribute(): string
     {
-        if ($this->hasRole('admin'))   return 'admin';
-        if ($this->hasRole('medico'))  return 'medico';
+        if ($this->hasRole('admin'))  return 'admin';
+        if ($this->hasRole('medico')) return 'medico';
         return 'paciente';
     }
 
-    // Agrega estos métodos al modelo User existente
+    public function patientProfile()
+    {
+        return $this->hasOne(PatientProfile::class);
+    }
 
-public function patientProfile()
-{
-    return $this->hasOne(PatientProfile::class);
-}
+    public function doctorProfile()
+    {
+        return $this->hasOne(DoctorProfile::class);
+    }
 
-public function doctorProfile()
-{
-    return $this->hasOne(DoctorProfile::class);
-}
-
-public function patientDocuments()
-{
-    return $this->hasMany(PatientDocument::class);
-}
+    public function patientDocuments()
+    {
+        return $this->hasMany(PatientDocument::class);
+    }
 }
