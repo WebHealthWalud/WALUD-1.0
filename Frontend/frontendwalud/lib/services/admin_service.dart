@@ -7,6 +7,8 @@ class AdminService {
   static const _base = 'admin';
 
   // ── Stats
+  // ✅ El backend ahora retorna 'total_historias' en este mismo endpoint.
+  //    No se necesita una segunda llamada para contar historias clínicas.
   static Future<Map<String, dynamic>> getStats() async {
     try {
       final r = await ApiService.getAuth('$_base/stats');
@@ -18,7 +20,7 @@ class AdminService {
     }
   }
 
-  // ── Usuarios — filtro por rol correcto
+  // ── Usuarios
   static Future<Map<String, dynamic>> getUsers({
     String? rol,
     bool? isActive,
@@ -31,7 +33,6 @@ class AdminService {
       if (isActive != null) ep += '&is_active=${isActive ? 1 : 0}';
       if (search != null && search.isNotEmpty)
         ep += '&search=${Uri.encodeComponent(search)}';
-
       final r = await ApiService.getAuth(ep);
       if (r.statusCode == 200) {
         final data = jsonDecode(r.body);
@@ -147,7 +148,7 @@ class AdminService {
     }
   }
 
-  // ── Citas con búsqueda por documento
+  // ── Citas
   static Future<Map<String, dynamic>> getAppointments({
     String? status,
     String? search,
@@ -207,39 +208,39 @@ class AdminService {
     }
   }
 
+  // ── Historias clínicas
+  // ✅ FIX CRÍTICO: ruta corregida de 'medical-records' → 'admin/medical-records'
+  //    La versión anterior apuntaba al endpoint del médico (rol médico requerido),
+  //    por eso el admin recibía 403 o datos vacíos.
   static Future<Map<String, dynamic>> getMedicalRecords({
     String? search,
+    String? especialidad,
     int page = 1,
   }) async {
     try {
       var ep = '$_base/medical-records?page=$page';
-
-      if (search != null && search.isNotEmpty) {
+      if (search != null && search.isNotEmpty)
         ep += '&search=${Uri.encodeComponent(search)}';
-      }
+      if (especialidad != null && especialidad.isNotEmpty)
+        ep += '&especialidad=${Uri.encodeComponent(especialidad)}';
 
       final r = await ApiService.getAuth(ep);
-
       if (r.statusCode == 200) {
         final data = jsonDecode(r.body);
-
+        final List items = data is List ? data : (data['data'] ?? []);
         return {
           'success': true,
-          'records': (data['data'] as List)
-              .map((e) => MedicalRecord.fromJson(e))
-              .toList(),
+          'records': items.map((e) => MedicalRecord.fromJson(e)).toList(),
+          'total': data is Map ? (data['total'] ?? items.length) : items.length,
+          'last_page': data is Map ? (data['last_page'] ?? 1) : 1,
         };
       }
-
       return {
         'success': false,
-        'message': 'Error al obtener historial clínico',
+        'message': 'Error al obtener historial clínico (${r.statusCode})',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error: $e',
-      };
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 }

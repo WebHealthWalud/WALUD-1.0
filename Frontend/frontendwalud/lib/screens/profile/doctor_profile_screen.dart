@@ -88,7 +88,12 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           if (_profile?.horariosAtencion != null) {
             _profile!.horariosAtencion!.forEach((key, value) {
               if (_horarios.containsKey(key)) {
-                _horarios[key] = Map<String, String>.from(value);
+                /////_horarios[key] = Map<String, String>.from(value);
+                _horarios[key] = {
+                  'inicio': value['inicio']?.toString() ?? '',
+                  'fin': value['fin']?.toString() ?? '',
+                  'activo': value['activo']?.toString() ?? 'false',
+                };
               }
             });
           }

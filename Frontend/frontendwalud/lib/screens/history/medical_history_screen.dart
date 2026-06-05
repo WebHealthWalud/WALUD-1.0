@@ -1,4 +1,3 @@
-// lib/screens/history/medical_history_screen.dart
 import 'package:flutter/material.dart';
 import '../../config/constants.dart';
 import '../../models/medical_record.dart';
