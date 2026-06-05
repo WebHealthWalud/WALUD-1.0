@@ -10,16 +10,16 @@ use Spatie\Permission\Models\Permission;
 class RoleSeeder extends Seeder
 {
     public function run(): void
-    {
-        // Crear roles
-        $rolePaciente = Role::create(['name' => 'paciente', 'guard_name' => 'api']);
-        $roleMedico = Role::create(['name' => 'medico', 'guard_name' => 'api']);
-        $roleAdmin = Role::create(['name' => 'admin', 'guard_name' => 'api']);
+{
+    // Roles
+    Role::firstOrCreate(['name' => 'paciente', 'guard_name' => 'api']);
+    Role::firstOrCreate(['name' => 'medico',   'guard_name' => 'api']);
+    Role::firstOrCreate(['name' => 'admin',    'guard_name' => 'api']);
 
-        // Permisos básicos
-        Permission::create(['name' => 'ver citas', 'guard_name' => 'api']);
-        Permission::create(['name' => 'crear citas', 'guard_name' => 'api']);
-        Permission::create(['name' => 'editar citas', 'guard_name' => 'api']);
-        Permission::create(['name' => 'eliminar citas', 'guard_name' => 'api']);
-    }
+    // Permisos — cambia todos los Permission::create por Permission::firstOrCreate
+    Permission::firstOrCreate(['name' => 'ver citas',      'guard_name' => 'api']);
+    Permission::firstOrCreate(['name' => 'crear citas',    'guard_name' => 'api']);
+    Permission::firstOrCreate(['name' => 'cancelar citas', 'guard_name' => 'api']);
+    // ... el resto de permisos que tengas, todos con firstOrCreate
+}
 }

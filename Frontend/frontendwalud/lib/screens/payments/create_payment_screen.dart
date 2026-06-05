@@ -31,38 +31,39 @@ class _CreatePaymentScreenState extends State<CreatePaymentScreen> {
       if (r['success'] && mounted) setState(() => _currentUser = r['user']);
     });
   }
+Future<void> _submit() async {
+  if (!_formKey.currentState!.validate()) return;
+  setState(() => _isSaving = true);
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
+  final r = await PaymentService.create(
+    concepto:         _conceptoCtrl.text.trim(),
+    tipo:             _tipo.name,
+    monto:            double.parse(_montoCtrl.text.replaceAll(',', '.')),
+    estadoPago:       'pendiente',
+    fechaVencimiento: _vence != null
+        ? DateFormat('yyyy-MM-dd').format(_vence!) : null,
+    notas:            _notasCtrl.text.trim().isNotEmpty
+        ? _notasCtrl.text.trim() : null,
+  );
 
-    final payment = Payment(
-      patientId:        _currentUser!.id!,
-      concepto:         _conceptoCtrl.text.trim(),
-      tipo:             _tipo,
-      monto:            double.parse(_montoCtrl.text.replaceAll(',', '.')),
-      estadoPago:       PaymentStatus.pendiente,
-      fechaVencimiento: _vence,
-      notas:            _notasCtrl.text.trim().isNotEmpty ? _notasCtrl.text.trim() : null,
-    );
+  setState(() => _isSaving = false);
 
-    final r = await PaymentService.create(payment);
-    setState(() => _isSaving = false);
-
-    if (mounted) {
-      if (r['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pago registrado correctamente'), backgroundColor: Color(0xFF10B981)),
-        );
-        widget.onCreated?.call();
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(r['message']), backgroundColor: Colors.red),
-        );
-      }
+  if (mounted) {
+    if (r['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('✅ Pago registrado correctamente'),
+        backgroundColor: Color(0xFF10B981),
+      ));
+      widget.onCreated?.call();
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(r['message'] ?? 'Error'),
+        backgroundColor: Colors.red,
+      ));
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

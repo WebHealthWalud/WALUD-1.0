@@ -5,68 +5,142 @@ import 'api_service.dart';
 import '../config/api_config.dart';
 
 class AuthService {
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
     try {
-      final response = await ApiService.post(ApiConfig.loginEndpoint, {'email': email, 'password': password});
+      final response = await ApiService.post(ApiConfig.loginEndpoint, {
+        'email': email,
+        'password': password,
+      });
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['token'] != null) {
           await ApiService.saveToken(data['token']);
-          await _saveUserData(data['user']);
+          // ✅ Normalizar antes de guardar para que el cache tenga tipo_from_role
+          await _saveUserData(_normalizeUserData(data['user']));
         }
-        return {'success': true, 'user': User.fromJson(data['user']), 'token': data['token']};
+        return {
+          'success': true,
+          'user': User.fromJson(data['user']),
+          'token': data['token'],
+        };
       }
       final error = jsonDecode(response.body);
-      return {'success': false, 'message': error['message'] ?? 'Error al iniciar sesión'};
+      return {
+        'success': false,
+        'message': error['message'] ?? 'Error al iniciar sesión',
+      };
     } catch (e) {
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
 
   static Future<Map<String, dynamic>> register({
-    required String       document,
+    required String document,
     required DocumentType documentType,
-    required String       name,
-    required String       lastName,
-    required String       email,
-    required String       password,
-    required String       passwordConfirmation,
-    required String       birthDate,
-    required String       userType,
-    String?               especialidad,
+    required String name,
+    required String lastName,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+    required String birthDate,
+    required String phone,
+    required String genero,
+    String? tipoSangre,
+    String? alergias,
+    bool notificacionesEmail = true,
+    bool notificacionesSms = false,
   }) async {
     try {
       final body = {
-        'document':              document,
-        'tipo_documento':        documentType.value,
-        'name':                  name,
-        'last_name':             lastName,
-        'email':                 email,
-        'password':              password,
+        'document': document,
+        'tipo_documento': documentType.value,
+        'name': name,
+        'last_name': lastName,
+        'email': email,
+        'password': password,
         'password_confirmation': passwordConfirmation,
-        'birth_date':            birthDate,
-        'tipo_usuario':          userType,
-        if (especialidad != null && especialidad.isNotEmpty) 'especialidad': especialidad,
+        'birth_date': birthDate,
+        'phone': phone,
+        'genero': genero,
+        if (tipoSangre != null && tipoSangre.isNotEmpty)
+          'tipo_sangre': tipoSangre,
+        if (alergias != null && alergias.isNotEmpty) 'alergias': alergias,
+        'notificaciones_email': notificacionesEmail,
+        'notificaciones_sms': notificacionesSms,
       };
-
       final response = await ApiService.post(ApiConfig.registerEndpoint, body);
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'message': data['message'] ?? 'Registro exitoso', 'user': User.fromJson(data['user'])};
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Registro exitoso',
+          'user': User.fromJson(data['user']),
+        };
       }
       final error = jsonDecode(response.body);
-      return {'success': false, 'message': error['message'] ?? 'Error al registrar', 'errors': error['errors']};
+      return {
+        'success': false,
+        'message': error['message'] ?? 'Error al registrar',
+        'errors': error['errors'],
+      };
     } catch (e) {
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
 
+  // ✅ Normaliza el JSON del usuario antes de guardarlo en SharedPreferences.
+  //    Garantiza que tipo_from_role esté siempre presente en el cache,
+  //    evitando que al leer del cache el rol aparezca como 'paciente'.
+  static Map<String, dynamic> _normalizeUserData(Map<String, dynamic> data) {
+    final normalized = Map<String, dynamic>.from(data);
+
+    // Resolver el rol con la misma prioridad que User.fromJson()
+    String? rolResuelto;
+
+    // 1. tipo_from_role del backend (accessor de Spatie con $appends)
+    if (normalized['tipo_from_role'] != null &&
+        normalized['tipo_from_role'].toString().isNotEmpty) {
+      rolResuelto = normalized['tipo_from_role'].toString();
+    }
+    // 2. Inferir desde roles[]
+    else {
+      final roles = <String>[];
+      if (normalized['roles'] is List) {
+        for (final r in normalized['roles'] as List) {
+          if (r is String) roles.add(r);
+          if (r is Map && r['name'] != null) roles.add(r['name'].toString());
+        }
+      }
+      if (roles.contains('admin'))
+        rolResuelto = 'admin';
+      else if (roles.contains('medico'))
+        rolResuelto = 'medico';
+      else if (roles.contains('paciente'))
+        rolResuelto = 'paciente';
+    }
+
+    // 3. Fallback al campo legacy
+    rolResuelto ??= normalized['tipo_usuario']?.toString() ?? 'paciente';
+
+    // ✅ Sobreescribir ambos campos para que el cache sea consistente
+    normalized['tipo_from_role'] = rolResuelto;
+    normalized['tipo_usuario'] = rolResuelto;
+
+    return normalized;
+  }
+
   static Future<void> _saveUserData(Map<String, dynamic> userData) async =>
-    (await SharedPreferences.getInstance()).setString('user_data', jsonEncode(userData));
+      (await SharedPreferences.getInstance()).setString(
+        'user_data',
+        jsonEncode(userData),
+      );
 
   static Future<User?> getSavedUser() async {
     try {
-      final prefs    = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString('user_data');
       if (userData != null) return User.fromJson(jsonDecode(userData));
     } catch (_) {}
@@ -89,15 +163,20 @@ class AuthService {
       final response = await ApiService.getAuth(ApiConfig.meEndpoint);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _saveUserData(data);
-        return {'success': true, 'user': User.fromJson(data)};
+        // ✅ Normalizar ANTES de guardar en cache
+        final normalized = _normalizeUserData(data);
+        await _saveUserData(normalized);
+        return {'success': true, 'user': User.fromJson(normalized)};
       }
+      // Si el backend falla, usar cache normalizado
       final saved = await getSavedUser();
-      if (saved != null) return {'success': true, 'user': saved, 'cached': true};
+      if (saved != null)
+        return {'success': true, 'user': saved, 'cached': true};
       return {'success': false, 'message': 'No se pudo obtener el usuario'};
     } catch (e) {
       final saved = await getSavedUser();
-      if (saved != null) return {'success': true, 'user': saved, 'cached': true};
+      if (saved != null)
+        return {'success': true, 'user': saved, 'cached': true};
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
@@ -105,7 +184,8 @@ class AuthService {
   static Future<Map<String, dynamic>> logout() async {
     try {
       final token = await ApiService.getToken();
-      if (token != null) await ApiService.postAuth(ApiConfig.logoutEndpoint, {});
+      if (token != null)
+        await ApiService.postAuth(ApiConfig.logoutEndpoint, {});
     } catch (_) {}
     await ApiService.clearToken();
     (await SharedPreferences.getInstance()).remove('user_data');
