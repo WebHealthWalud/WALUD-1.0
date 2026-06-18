@@ -54,26 +54,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<_NavItem> get _navItems {
-    
     final items = <_NavItem>[
       const _NavItem(icon: Icons.grid_view_rounded, label: 'Inicio'),
       const _NavItem(icon: Icons.calendar_today_outlined, label: 'Citas'),
-      const _NavItem(icon: Icons.history_outlined, label: 'Historial'), 
-      _NavItem(icon: Icons.history_outlined, label: _currentUser?.name ?? 'Historial' ), // ✅
+      const _NavItem(icon: Icons.history_outlined, label: 'Historial'),
     ];
     if (_currentUser?.isDoctor == true) {
-      print("Doctor detectado");
       items.add(
         const _NavItem(icon: Icons.people_outlined, label: 'Pacientes'),
-        
       );
     }
     if (_currentUser?.isPatient == true) {
-      print("Paciente detectado");
       items.add(const _NavItem(icon: Icons.payment_outlined, label: 'Pagos'));
-      
-    }else if(_currentUser?.isDoctor == true){
-      print("No se detecto");
+    } else if (_currentUser?.isDoctor == true) {
     }
     items.add(const _NavItem(icon: Icons.person_outline, label: 'Perfil'));
     return items;
