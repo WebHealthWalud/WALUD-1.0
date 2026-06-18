@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import 'api_service.dart';
@@ -15,29 +14,24 @@ class AuthService {
         'email': email,
         'password': password,
       });
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // Guardar token con verificación
         if (data['token'] != null) {
           await ApiService.saveToken(data['token']);
-          // Guardar también el usuario para recuperación rápida
-          await _saveUserData(data['user']);
+          // ✅ Normalizar antes de guardar para que el cache tenga tipo_from_role
+          await _saveUserData(_normalizeUserData(data['user']));
         }
-
         return {
           'success': true,
           'user': User.fromJson(data['user']),
           'token': data['token'],
         };
-      } else {
-        final error = jsonDecode(response.body);
-        return {
-          'success': false,
-          'message': error['message'] ?? 'Error al iniciar sesión',
-        };
       }
+      final error = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': error['message'] ?? 'Error al iniciar sesión',
+      };
     } catch (e) {
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
@@ -45,127 +39,156 @@ class AuthService {
 
   static Future<Map<String, dynamic>> register({
     required String document,
+    required DocumentType documentType,
     required String name,
     required String lastName,
     required String email,
     required String password,
     required String passwordConfirmation,
     required String birthDate,
-    required String userType,
+    required String phone,
+    required String genero,
+    String? tipoSangre,
+    String? alergias,
+    bool notificacionesEmail = true,
+    bool notificacionesSms = false,
   }) async {
     try {
-      final response = await ApiService.post(ApiConfig.registerEndpoint, {
+      final body = {
         'document': document,
+        'tipo_documento': documentType.value,
         'name': name,
         'last_name': lastName,
         'email': email,
         'password': password,
         'password_confirmation': passwordConfirmation,
         'birth_date': birthDate,
-        'tipo_usuario': userType,
-      });
-
+        'phone': phone,
+        'genero': genero,
+        if (tipoSangre != null && tipoSangre.isNotEmpty)
+          'tipo_sangre': tipoSangre,
+        if (alergias != null && alergias.isNotEmpty) 'alergias': alergias,
+        'notificaciones_email': notificacionesEmail,
+        'notificaciones_sms': notificacionesSms,
+      };
+      final response = await ApiService.post(ApiConfig.registerEndpoint, body);
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-
-        // NO guardar token en registro (el usuario debe loguearse)
-        // if (data['token'] != null) {
-        //   await ApiService.saveToken(data['token']);
-        // }
-
         return {
           'success': true,
           'message': data['message'] ?? 'Registro exitoso',
           'user': User.fromJson(data['user']),
         };
-      } else {
-        final error = jsonDecode(response.body);
-        return {
-          'success': false,
-          'message': error['message'] ?? 'Error al registrar',
-          'errors': error['errors'],
-        };
       }
+      final error = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': error['message'] ?? 'Error al registrar',
+        'errors': error['errors'],
+      };
     } catch (e) {
       return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
 
-  // NUEVO: Guardar datos del usuario en SharedPreferences
-  static Future<void> _saveUserData(Map<String, dynamic> userData) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_data', jsonEncode(userData));
+  // ✅ Normaliza el JSON del usuario antes de guardarlo en SharedPreferences.
+  //    Garantiza que tipo_from_role esté siempre presente en el cache,
+  //    evitando que al leer del cache el rol aparezca como 'paciente'.
+  static Map<String, dynamic> _normalizeUserData(Map<String, dynamic> data) {
+    final normalized = Map<String, dynamic>.from(data);
+
+    // Resolver el rol con la misma prioridad que User.fromJson()
+    String? rolResuelto;
+
+    // 1. tipo_from_role del backend (accessor de Spatie con $appends)
+    if (normalized['tipo_from_role'] != null &&
+        normalized['tipo_from_role'].toString().isNotEmpty) {
+      rolResuelto = normalized['tipo_from_role'].toString();
+    }
+    // 2. Inferir desde roles[]
+    else {
+      final roles = <String>[];
+      if (normalized['roles'] is List) {
+        for (final r in normalized['roles'] as List) {
+          if (r is String) roles.add(r);
+          if (r is Map && r['name'] != null) roles.add(r['name'].toString());
+        }
+      }
+      if (roles.contains('admin'))
+        rolResuelto = 'admin';
+      else if (roles.contains('medico'))
+        rolResuelto = 'medico';
+      else if (roles.contains('paciente'))
+        rolResuelto = 'paciente';
+    }
+
+    // 3. Fallback al campo legacy
+    rolResuelto ??= normalized['tipo_usuario']?.toString() ?? 'paciente';
+
+    // ✅ Sobreescribir ambos campos para que el cache sea consistente
+    normalized['tipo_from_role'] = rolResuelto;
+    normalized['tipo_usuario'] = rolResuelto;
+
+    return normalized;
   }
 
-  // NUEVO: Recuperar usuario guardado
+  static Future<void> _saveUserData(Map<String, dynamic> userData) async =>
+      (await SharedPreferences.getInstance()).setString(
+        'user_data',
+        jsonEncode(userData),
+      );
+
   static Future<User?> getSavedUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString('user_data');
-      if (userData != null) {
-        return User.fromJson(jsonDecode(userData));
-      }
-    } catch (e) {
-      // Ignorar errores
-    }
+      if (userData != null) return User.fromJson(jsonDecode(userData));
+    } catch (_) {}
     return null;
   }
 
-  // NUEVO: Verificar si hay sesión activa válida
   static Future<bool> hasValidSession() async {
     final token = await ApiService.getToken();
     if (token == null || token.isEmpty) return false;
-
-    // Opcional: Verificar con el backend que el token sigue válido
     try {
       final response = await ApiService.getAuth(ApiConfig.meEndpoint);
       return response.statusCode == 200;
-    } catch (e) {
+    } catch (_) {
       return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getCurrentUser() async {
+    try {
+      final response = await ApiService.getAuth(ApiConfig.meEndpoint);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // ✅ Normalizar ANTES de guardar en cache
+        final normalized = _normalizeUserData(data);
+        await _saveUserData(normalized);
+        return {'success': true, 'user': User.fromJson(normalized)};
+      }
+      // Si el backend falla, usar cache normalizado
+      final saved = await getSavedUser();
+      if (saved != null)
+        return {'success': true, 'user': saved, 'cached': true};
+      return {'success': false, 'message': 'No se pudo obtener el usuario'};
+    } catch (e) {
+      final saved = await getSavedUser();
+      if (saved != null)
+        return {'success': true, 'user': saved, 'cached': true};
+      return {'success': false, 'message': 'Error de conexión: $e'};
     }
   }
 
   static Future<Map<String, dynamic>> logout() async {
     try {
       final token = await ApiService.getToken();
-      if (token != null) {
+      if (token != null)
         await ApiService.postAuth(ApiConfig.logoutEndpoint, {});
-      }
-    } catch (e) {
-      // Ignorar errores en logout
-    } finally {
-      // Limpiar token Y datos de usuario
-      await ApiService.clearToken();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('user_data');
-    }
-    return {'success': true, 'message': 'Sesión cerrada'};
-  }
-
-  static Future<Map<String, dynamic>> getCurrentUser() async {
-    try {
-      final response = await ApiService.getAuth(ApiConfig.meEndpoint);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        // Actualizar datos guardados
-        await _saveUserData(data);
-        return {'success': true, 'user': User.fromJson(data)};
-      } else {
-        // Si falla, intentar recuperar usuario guardado
-        final savedUser = await getSavedUser();
-        if (savedUser != null) {
-          return {'success': true, 'user': savedUser, 'cached': true};
-        }
-        return {'success': false, 'message': 'No se pudo obtener el usuario'};
-      }
-    } catch (e) {
-      // Fallback a usuario guardado
-      final savedUser = await getSavedUser();
-      if (savedUser != null) {
-        return {'success': true, 'user': savedUser, 'cached': true};
-      }
-      return {'success': false, 'message': 'Error de conexión: $e'};
-    }
+    } catch (_) {}
+    await ApiService.clearToken();
+    (await SharedPreferences.getInstance()).remove('user_data');
+    return {'success': true};
   }
 }
