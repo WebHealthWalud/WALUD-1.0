@@ -4,6 +4,7 @@ import '../../config/constants.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import 'login_screen.dart';
+import 'terms_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -24,7 +25,13 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _birthDateController = TextEditingController();
   final _alergiasController  = TextEditingController();
 
+  // ✅ T&C: el usuario debe aceptar antes de ver el formulario
+  bool _termsAccepted = false;
+
+  // Tipo de documento — se actualiza automáticamente según la edad
   DocumentType _docType   = DocumentType.cedulaCiudadania;
+  // Hint que muestra al usuario la regla aplicada
+  String? _docTypeHint;
   String? _genero;
   String? _tipoSangre;
   bool _notifEmail = true;
@@ -60,10 +67,39 @@ class _RegisterScreenState extends State<RegisterScreen>
       context: context,
       initialDate: DateTime(2000),
       firstDate: DateTime(1920),
-      lastDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+      lastDate: DateTime.now().subtract(const Duration(days: 365)),
     );
     if (d != null && mounted) {
-      setState(() => _birthDateController.text = DateFormat('yyyy-MM-dd').format(d));
+      setState(() {
+        _birthDateController.text = DateFormat('yyyy-MM-dd').format(d);
+        // ✅ Vincular edad → tipo de documento según normativa colombiana
+        _updateDocTypeFromDate(d);
+      });
+    }
+  }
+
+  /// Asigna automáticamente el tipo de documento según la edad del usuario.
+  /// Reglas:
+  ///   0 – 6 años  → Registro Civil de Nacimiento
+  ///   7 – 17 años → Tarjeta de Identidad
+  ///   ≥ 18 años   → Cédula de Ciudadanía
+  void _updateDocTypeFromDate(DateTime birthDate) {
+    final now  = DateTime.now();
+    int age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+
+    if (age < 7) {
+      _docType     = DocumentType.registroCivil;
+      _docTypeHint = 'Registro Civil (0–6 años) — asignado automáticamente';
+    } else if (age < 18) {
+      _docType     = DocumentType.tarjetaIdentidad;
+      _docTypeHint = 'Tarjeta de Identidad (7–17 años) — asignado automáticamente';
+    } else {
+      _docType     = DocumentType.cedulaCiudadania;
+      _docTypeHint = 'Cédula de Ciudadanía (≥18 años) — asignado automáticamente';
     }
   }
 
@@ -138,6 +174,21 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Mostrar T&C primero; el formulario solo aparece tras la aceptación
+    if (!_termsAccepted) {
+      return TermsScreen(
+        onAccepted: () => setState(() => _termsAccepted = true),
+        onDeclined: () {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
+          }
+        },
+      );
+    }
+
     return Scaffold(
       body: Row(children: [
         if (MediaQuery.of(context).size.width > 700)
@@ -365,8 +416,23 @@ class _RegisterScreenState extends State<RegisterScreen>
       decoration: _deco('', Icons.badge_outlined),
       items: DocumentType.values.map((t) => DropdownMenuItem(
         value: t, child: Text(t.label, style: const TextStyle(fontSize: 13)))).toList(),
-      onChanged: (v) { if (v != null) setState(() => _docType = v); },
+      onChanged: (v) { if (v != null) setState(() { _docType = v; _docTypeHint = null; }); },
     ),
+    if (_docTypeHint != null) ...[
+      const SizedBox(height: 6),
+      Row(children: [
+        const Icon(Icons.auto_awesome, size: 13, color: Color(0xFF4F46E5)),
+        const SizedBox(width: 5),
+        Expanded(child: Text(_docTypeHint!,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF4F46E5)))),
+        GestureDetector(
+          onTap: () => setState(() => _docTypeHint = null),
+          child: Text('Cambiar manualmente',
+            style: TextStyle(fontSize: 11, color: Colors.grey[400],
+              decoration: TextDecoration.underline)),
+        ),
+      ]),
+    ],
     const SizedBox(height: 14),
     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

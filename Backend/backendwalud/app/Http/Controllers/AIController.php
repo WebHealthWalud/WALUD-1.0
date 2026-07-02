@@ -14,6 +14,9 @@ class AIController extends Controller
         $this->aiService = $aiService;
     }
 
+    // ==================================================
+    // PACIENTE → PRECONSULTA IA
+    // ==================================================
     public function preconsulta(Request $request)
     {
         $request->validate([
@@ -22,6 +25,22 @@ class AIController extends Controller
 
         $resultado = $this->aiService->analizarSintomas(
             $request->mensaje
+        );
+
+        return response()->json($resultado);
+    }
+
+    // ==================================================
+    // MÉDICO → RESUMEN DEL PACIENTE
+    // ==================================================
+    public function resumenPaciente(Request $request)
+    {
+        $request->validate([
+            'documento' => 'required|string'
+        ]);
+
+        $resultado = $this->aiService->generarResumenPaciente(
+            $request->documento
         );
 
         return response()->json($resultado);

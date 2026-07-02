@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/admin/admin_screen.dart';
 import 'services/auth_service.dart';
 import 'screens/landing/landing_page.dart';
 
@@ -62,13 +63,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     if (mounted) {
       if (hasSession) {
-        // ✅ Si hay sesión activa → Dashboard directo
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
-        );
+        // ✅ Obtener usuario actual para verificar rol correctamente
+        final userResult = await AuthService.getCurrentUser();
+        final user = userResult['success'] == true ? userResult['user'] : null;
+
+        if (mounted) {
+          if (user != null && user.isAdmin) {
+            // ✅ Admin → Panel de administrador
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+            );
+          } else {
+            // ✅ Paciente / Médico → Dashboard
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            );
+          }
+        }
       } else {
-        // ✅ Si no hay sesión → LandingPage
+        // ✅ Sin sesión → LandingPage
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LandingPage()),
@@ -112,39 +127,3 @@ class _AuthWrapperState extends State<AuthWrapper> {
     );
   }
 }
-
-  @override
-  Widget build(BuildContext context) {
-    // Muestra un splash/loading mientras verifica
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF6EE7B7), Color(0xFF4F46E5)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.local_hospital, size: 80, color: Colors.white),
-              SizedBox(height: 24),
-              Text(
-                'WALUD',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: 32),
-              CircularProgressIndicator(color: Colors.white),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-

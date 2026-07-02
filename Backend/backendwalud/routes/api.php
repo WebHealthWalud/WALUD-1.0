@@ -99,6 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── IA
     Route::post('/ia/preconsulta', [AIController::class, 'preconsulta']);
+    Route::post('/ia/resumen-paciente', [AIController::class, 'resumenPaciente']);
 
     // ── Admin
     Route::prefix('admin')->group(function () {
