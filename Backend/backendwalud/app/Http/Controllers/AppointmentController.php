@@ -225,7 +225,7 @@ class AppointmentController extends Controller
                         $html
                     );
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::warning('No se pudo enviar el correo de confirmación de cita', ['error' => $e->getMessage()]);
             }
 

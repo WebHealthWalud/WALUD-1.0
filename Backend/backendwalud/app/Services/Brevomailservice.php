@@ -25,7 +25,7 @@ class BrevoMailService
 
     public function __construct()
     {
-        $this->apiKey = config('services.brevo.api_key', '');
+        $this->apiKey = config('services.brevo.api_key') ?? '';
     }
 
     public function isConfigured(): bool
