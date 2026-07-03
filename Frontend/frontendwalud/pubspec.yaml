@@ -23,6 +23,7 @@ dependencies:
   mime: ^1.0.4
   url_launcher: ^6.2.4
   flutter_secure_storage: ^10.2.0
+  url_strategy: ^0.3.0
 
 dev_dependencies:
   flutter_test:

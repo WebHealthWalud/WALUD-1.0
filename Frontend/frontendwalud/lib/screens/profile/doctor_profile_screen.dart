@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../models/doctor_profile.dart';
 import '../../models/user.dart';
+import '../../config/constants.dart';
 import '../../services/auth_service.dart';
 import '../../services/doctor_profile_service.dart';
 import '../../services/profile_service.dart';
@@ -22,6 +23,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   bool _isSaving         = false;
   bool _isUploadingPhoto = false;
   bool _showEditForm     = false;
+  String? _especialidad;
 
   // Controladores perfil
   final _rethusCtrl = TextEditingController();
@@ -74,7 +76,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     if (mounted) {
       setState(() {
         _isLoading = false;
-        if (userR['success'])    _user    = userR['user'];
+        if (userR['success']) {
+          _user         = userR['user'];
+          _especialidad = _user?.especialidad;
+        }
         if (profileR['success']) {
           _profile     = profileR['profile'];
           _formacion   = List<Map<String, dynamic>>.from(
@@ -155,7 +160,14 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       areasEnfoque:        _areas,
       horariosAtencion:    _horarios.map((k, v) => MapEntry(k, v)),
       ubicacionesConsulta: _ubicaciones,
+      especialidad:        _especialidad,
     );
+
+    if (r['success'] == true) {
+      final userR = await AuthService.getCurrentUser();
+      if (userR['success'] == true) _user = userR['user'];
+    }
+
     setState(() => _isSaving = false);
 
     if (mounted) {
@@ -509,6 +521,27 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       title: 'Editar Perfil Profesional',
       icon:  Icons.edit_outlined,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Especialidad', style: TextStyle(
+          fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A),
+        )),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _especialidad,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.medical_services_outlined, size: 18),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Colors.grey.shade200)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          items: kEspecialidades
+              .map((e) => DropdownMenuItem(value: e['value'], child: Text(e['label']!)))
+              .toList(),
+          onChanged: (v) => setState(() => _especialidad = v),
+        ),
+        const SizedBox(height: 20),
         _formField('Número RETHUS', _rethusCtrl,
             icon: Icons.badge_outlined),
         const SizedBox(height: 20),

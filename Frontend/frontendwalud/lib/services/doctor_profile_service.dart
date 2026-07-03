@@ -30,6 +30,7 @@ class DoctorProfileService {
     List<String>?                  areasEnfoque,
     Map<String, dynamic>?          horariosAtencion,
     List<Map<String, dynamic>>?    ubicacionesConsulta,
+    String?                        especialidad,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -38,6 +39,7 @@ class DoctorProfileService {
         if (areasEnfoque != null)        'areas_enfoque':        areasEnfoque,
         if (horariosAtencion != null)    'horarios_atencion':    horariosAtencion,
         if (ubicacionesConsulta != null) 'ubicaciones_consulta': ubicacionesConsulta,
+        if (especialidad != null)        'especialidad':         especialidad,
       };
       final response = await ApiService.putAuth(_endpoint, body);
       if (response.statusCode == 200) {

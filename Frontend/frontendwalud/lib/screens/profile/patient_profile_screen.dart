@@ -37,6 +37,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   final _contactoNombreCtrl   = TextEditingController();
   final _contactoTelefonoCtrl = TextEditingController();
   final _contactoRelacionCtrl = TextEditingController();
+  final _alergiasCtrl         = TextEditingController();
+  String? _genero;
+  String? _tipoSangre;
 
   // Seguridad
   bool _isChangingPass   = false;
@@ -74,7 +77,12 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     if (mounted) {
       setState(() {
         _isLoading = false;
-        if (userR['success'])    _user    = userR['user'];
+        if (userR['success']) {
+          _user       = userR['user'];
+          _genero     = _user?.genero;
+          _tipoSangre = _user?.tipoSangre;
+          _alergiasCtrl.text = _user?.alergias ?? '';
+        }
         if (profileR['success']) {
           _profile = profileR['profile'];
           if (_profile?.peso != null)
@@ -163,7 +171,16 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       contactoNombre:   _contactoNombreCtrl.text.trim().isNotEmpty ? _contactoNombreCtrl.text.trim() : null,
       contactoTelefono: _contactoTelefonoCtrl.text.trim().isNotEmpty ? _contactoTelefonoCtrl.text.trim() : null,
       contactoRelacion: _contactoRelacionCtrl.text.trim().isNotEmpty ? _contactoRelacionCtrl.text.trim() : null,
+      genero:           _genero,
+      tipoSangre:       _tipoSangre,
+      alergias:         _alergiasCtrl.text.trim(),
     );
+
+    if (r['success'] == true) {
+      final userR = await AuthService.getCurrentUser();
+      if (userR['success'] == true) _user = userR['user'];
+    }
+
     setState(() => _isSaving = false);
 
     if (mounted) {
@@ -668,6 +685,70 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             Expanded(child: _field('Ciudad', _ciudadCtrl, icon: Icons.location_city_outlined)),
           ]),
         ],
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Información Médica', style: TextStyle(
+            fontWeight: FontWeight.bold, color: Color(0xFF1A1A7A)))),
+        const SizedBox(height: 12),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Género', style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF374151)))),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: kGeneros.map((g) {
+          final sel = _genero == g['value'];
+          return GestureDetector(
+            onTap: () => setState(() => _genero = g['value']),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: sel ? const Color(0xFF4F46E5).withOpacity(0.1) : const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: sel ? const Color(0xFF4F46E5) : Colors.grey.shade200),
+              ),
+              child: Text(g['label']!, style: TextStyle(
+                fontSize: 13,
+                color: sel ? const Color(0xFF4F46E5) : Colors.grey[700],
+                fontWeight: sel ? FontWeight.w600 : FontWeight.normal)),
+            ),
+          );
+        }).toList()),
+        const SizedBox(height: 16),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Tipo de Sangre', style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF374151)))),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: kTiposSangre.map((s) {
+          final sel = _tipoSangre == s;
+          return GestureDetector(
+            onTap: () => setState(() => _tipoSangre = s),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: sel ? const Color(0xFFEF4444).withOpacity(0.1) : const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: sel ? const Color(0xFFEF4444) : Colors.grey.shade200),
+              ),
+              child: Text(s, style: TextStyle(
+                fontSize: 13,
+                color: sel ? const Color(0xFFEF4444) : Colors.grey[700],
+                fontWeight: sel ? FontWeight.w600 : FontWeight.normal)),
+            ),
+          );
+        }).toList()),
+        const SizedBox(height: 16),
+        _fieldWithHint('Alergias', _alergiasCtrl,
+          icon: Icons.warning_amber_outlined,
+          hint: 'Ej: Penicilina, Polen',
+          helperText: 'Separa cada alergia con una coma'),
         const SizedBox(height: 16),
         const Divider(),
         const SizedBox(height: 8),

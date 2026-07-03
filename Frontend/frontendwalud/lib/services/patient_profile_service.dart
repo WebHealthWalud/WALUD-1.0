@@ -32,6 +32,9 @@ class PatientProfileService {
     String? contactoNombre,
     String? contactoTelefono,
     String? contactoRelacion,
+    String? genero,
+    String? tipoSangre,
+    String? alergias,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -42,6 +45,9 @@ class PatientProfileService {
         if (contactoNombre != null)   'contacto_emergencia_nombre':   contactoNombre,
         if (contactoTelefono != null) 'contacto_emergencia_telefono': contactoTelefono,
         if (contactoRelacion != null) 'contacto_emergencia_relacion': contactoRelacion,
+        if (genero != null)           'genero':                       genero,
+        if (tipoSangre != null)       'tipo_sangre':                  tipoSangre,
+        if (alergias != null)         'alergias':                     alergias,
       };
 
       final response = await ApiService.putAuth(_endpoint, body);

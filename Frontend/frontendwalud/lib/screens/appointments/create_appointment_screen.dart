@@ -53,7 +53,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   PickedFileResult? _pickedFile;
   String? _attachmentName;
 
-  static const double _costoConsulta = 85000;
+  static const double _costoConsulta = 20000;
 
   @override
   void initState() {

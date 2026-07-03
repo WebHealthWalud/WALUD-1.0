@@ -35,7 +35,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   String? _genero;
   String? _tipoSangre;
   bool _notifEmail = true;
-  bool _notifSms   = false;
   bool _isLoading  = false;
   bool _obscurePass   = true;
   bool _obscureConf   = true;
@@ -140,7 +139,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                ? _alergiasController.text.trim()
                                : null,
       notificacionesEmail:   _notifEmail,
-      notificacionesSms:     _notifSms,
+      notificacionesSms:     false,
     );
 
     setState(() => _isLoading = false);
@@ -469,14 +468,14 @@ class _RegisterScreenState extends State<RegisterScreen>
       },
     ),
     const SizedBox(height: 14),
-    _label('Teléfono (para notificaciones)'),
+    _label('Teléfono de contacto'),
     const SizedBox(height: 6),
     TextFormField(
       controller: _phoneController,
       keyboardType: TextInputType.phone,
       decoration: _deco('+57 300 000 0000', Icons.phone_outlined),
       validator: (v) {
-        if (v == null || v.trim().isEmpty) return 'Requerido para notificaciones';
+        if (v == null || v.trim().isEmpty) return 'Requerido';
         return null;
       },
     ),
@@ -622,25 +621,6 @@ class _RegisterScreenState extends State<RegisterScreen>
             onChanged: (v) => setState(() => _notifEmail = v),
           ),
         ]),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(children: [
-            const Icon(Icons.sms_outlined, size: 18, color: Color(0xFF06B6D4)),
-            const SizedBox(width: 8),
-            const Text('Notificaciones por SMS', style: TextStyle(fontSize: 13)),
-          ]),
-          Switch(
-            value: _notifSms,
-            activeColor: const Color(0xFF06B6D4),
-            onChanged: (v) => setState(() => _notifSms = v),
-          ),
-        ]),
-        if (_notifSms) Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            'Se enviará un código de verificación al número ${_phoneController.text.isNotEmpty ? _phoneController.text : "que registraste"} para activar el SMS.',
-            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-          ),
-        ),
       ]),
     ),
   ];
