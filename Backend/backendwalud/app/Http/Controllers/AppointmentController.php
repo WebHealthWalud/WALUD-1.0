@@ -5,6 +5,9 @@ use App\Models\Appointment;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
+use App\Services\BrevoMailService;
 use Carbon\Carbon;
 
 class AppointmentController extends Controller
@@ -201,12 +204,30 @@ class AppointmentController extends Controller
                         'appointment_id'    => $appointment->id,
                         'concepto'          => 'Consulta ' . $validated['especialidad'] . ' — Dr. ' . $user->name . ' ' . $user->last_name,
                         'tipo'              => 'consulta',
-                        'monto'             => 85000,
+                        'monto'             => 20000,
                         'estado_pago'       => 'pendiente',
                         'fecha_vencimiento' => now()->addDays(3)->toDateString(),
                         'notas'             => 'Cita agendada por el médico. Pendiente de pago.',
                     ]);
                 }
+
+            // ✅ Notificación por correo al paciente (vía API de Brevo, no bloquea la creación de la cita si falla)
+            try {
+                $patientUser = $patientId === $user->id ? $user : User::find($patientId);
+                if ($patientUser && $patientUser->notificaciones_email && $patientUser->email) {
+                    $appointmentWithDoctor = $appointment->load('doctor');
+                    $html = View::make('emails.appointment_created', ['appointment' => $appointmentWithDoctor])->render();
+
+                    (new BrevoMailService())->send(
+                        $patientUser->email,
+                        $patientUser->name . ' ' . $patientUser->last_name,
+                        'WALUD — Confirmación de tu cita médica',
+                        $html
+                    );
+                }
+            } catch (\Exception $e) {
+                Log::warning('No se pudo enviar el correo de confirmación de cita', ['error' => $e->getMessage()]);
+            }
 
             return response()->json([
                 'message' => 'Cita creada correctamente',

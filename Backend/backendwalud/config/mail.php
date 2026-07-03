@@ -47,6 +47,16 @@ return [
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            // ✅ Brevo a veces enruta a servidores regionales (ej: "...offshore-southamerica-east-v2.sendinblue.com")
+            // cuyo certificado SSL no coincide exactamente con "smtp-relay.brevo.com". Esto evita que
+            // Symfony Mailer rechace la conexión por ese desajuste de nombre, sin desactivar la encriptación.
+            'stream' => [
+                'ssl' => [
+                    'allow_self_signed' => true,
+                    'verify_peer'       => env('MAIL_VERIFY_PEER', true),
+                    'verify_peer_name'  => env('MAIL_VERIFY_PEER_NAME', true),
+                ],
+            ],
         ],
 
         'ses' => [

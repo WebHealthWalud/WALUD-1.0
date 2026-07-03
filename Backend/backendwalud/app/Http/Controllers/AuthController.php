@@ -90,11 +90,8 @@ class AuthController extends Controller
         $user  = Auth::user();
         $token = $user->createToken('token', ['*'], now()->addDays(7))->plainTextToken;
 
-        $photoUrl = null;
-        if ($user->profile_photo_path) {
-            $filename = basename($user->profile_photo_path);
-            $photoUrl = url("api/image/profile_photos/{$filename}");
-        }
+        // ✅ profile_photo_path ya es la URL completa de Cloudinary
+        $photoUrl = $user->profile_photo_path;
 
         // ✅ FIX ROL: tipo_usuario se sobrescribe con el rol real de Spatie
         //    para que Flutter siempre reciba el rol correcto.
@@ -125,11 +122,8 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        $photoUrl = null;
-        if ($user->profile_photo_path) {
-            $filename = basename($user->profile_photo_path);
-            $photoUrl = url("api/image/profile_photos/{$filename}");
-        }
+        // ✅ profile_photo_path ya es la URL completa de Cloudinary
+        $photoUrl = $user->profile_photo_path;
 
         // ✅ FIX ROL: mismo fix que en login().
         //    Este endpoint es el que se llama al refrescar la página.

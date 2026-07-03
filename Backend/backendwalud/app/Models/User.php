@@ -24,6 +24,7 @@ class User extends Authenticatable
         'birth_date',
         'especialidad',
         'profile_photo_path',
+        'profile_photo_public_id',
         'phone',
         'genero',
         'tipo_sangre',

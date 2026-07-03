@@ -11,6 +11,7 @@ class PatientDocument extends Model
         'nombre',
         'tipo',
         'archivo_path',
+        'cloudinary_public_id',
         'archivo_nombre',
         'mime_type',
         'tamanio',

@@ -70,7 +70,13 @@ class DoctorProfileController extends Controller
             'areas_enfoque.*'      => 'string',
             'horarios_atencion'    => 'nullable|array',
             'ubicaciones_consulta' => 'nullable|array',
+            'especialidad'         => 'nullable|string|max:100',
         ]);
+
+        if (array_key_exists('especialidad', $validated)) {
+            $user->update(['especialidad' => $validated['especialidad']]);
+            unset($validated['especialidad']);
+        }
 
         $profile = $user->doctorProfile ?? DoctorProfile::create(['user_id' => $user->id]);
         $profile->update($validated);

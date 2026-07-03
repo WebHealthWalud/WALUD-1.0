@@ -5,10 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\PatientProfile;
 use App\Models\PatientDocument;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Services\CloudinaryService;
 
 class PatientProfileController extends Controller
 {
+    protected CloudinaryService $cloudinary;
+
+    public function __construct(CloudinaryService $cloudinary)
+    {
+        $this->cloudinary = $cloudinary;
+    }
+
     // ── Ver perfil del paciente autenticado
     public function show(Request $request)
     {
@@ -31,7 +38,7 @@ class PatientProfileController extends Controller
         ]);
     }
 
-    // ── Completar perfil (peso, talla, dirección, contacto emergencia)
+    // ── Completar perfil (peso, talla, dirección, contacto emergencia, datos médicos)
     public function update(Request $request)
     {
         $user = $request->user();
@@ -44,10 +51,21 @@ class PatientProfileController extends Controller
             'contacto_emergencia_nombre'    => 'nullable|string|max:100',
             'contacto_emergencia_telefono'  => 'nullable|string|max:20',
             'contacto_emergencia_relacion'  => 'nullable|string|max:50',
+            'genero'                        => 'nullable|string|max:30',
+            'tipo_sangre'                   => 'nullable|string|max:10',
+            'alergias'                      => 'nullable|string|max:500',
         ]);
 
+        // Campos que pertenecen al usuario (no al perfil médico)
+        $userFields = collect($validated)->only(['genero', 'tipo_sangre', 'alergias'])->toArray();
+        if (!empty($userFields)) {
+            $user->update($userFields);
+        }
+
+        $profileFields = collect($validated)->except(['genero', 'tipo_sangre', 'alergias'])->toArray();
+
         $profile = $user->patientProfile ?? PatientProfile::create(['user_id' => $user->id]);
-        $profile->update($validated);
+        $profile->update($profileFields);
 
         // ✅ Actualizar perfil_completo automáticamente
         $profile->update(['perfil_completo' => $profile->checkIfComplete()]);
@@ -60,7 +78,7 @@ class PatientProfileController extends Controller
         ]);
     }
 
-    // ── Subir documento médico
+    // ── Subir documento médico (Cloudinary)
     public function uploadDocument(Request $request)
     {
         $user = $request->user();
@@ -71,27 +89,37 @@ class PatientProfileController extends Controller
             'tipo'      => 'nullable|string|max:50',
         ]);
 
-        $file     = $request->file('documento');
-        $path     = $file->store('patient_documents/' . $user->id, 'public');
-        $filename = $file->getClientOriginalName();
-        $mime     = $file->getMimeType();
-        $size     = $file->getSize();
+        $file = $request->file('documento');
+
+        try {
+            $result = $this->cloudinary->upload(
+                $file,
+                'walud/patient_documents/' . $user->id,
+                'auto'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
 
         $doc = PatientDocument::create([
-            'user_id'        => $user->id,
-            'nombre'         => $request->nombre,
-            'tipo'           => $request->tipo ?? 'general',
-            'archivo_path'   => $path,
-            'archivo_nombre' => $filename,
-            'mime_type'      => $mime,
-            'tamanio'        => $size,
+            'user_id'              => $user->id,
+            'nombre'               => $request->nombre,
+            'tipo'                 => $request->tipo ?? 'general',
+            'archivo_path'         => $result['secure_url'],
+            'cloudinary_public_id' => $result['public_id'],
+            'archivo_nombre'       => $file->getClientOriginalName(),
+            'mime_type'            => $file->getMimeType(),
+            'tamanio'              => $file->getSize(),
         ]);
 
         return response()->json([
             'success'  => true,
             'message'  => 'Documento subido correctamente',
             'data'     => array_merge($doc->toArray(), [
-                'archivo_url' => url("api/image/patient_documents/{$user->id}/" . basename($path)),
+                'archivo_url' => $doc->archivo_path, // ✅ ya es la URL completa de Cloudinary
             ]),
         ], 201);
     }
@@ -104,7 +132,7 @@ class PatientProfileController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(fn($d) => array_merge($d->toArray(), [
-                'archivo_url' => url("api/image/patient_documents/{$user->id}/" . basename($d->archivo_path)),
+                'archivo_url' => $d->archivo_path, // ✅ URL directa de Cloudinary
             ]));
 
         return response()->json(['success' => true, 'data' => $docs]);
@@ -118,7 +146,11 @@ class PatientProfileController extends Controller
             ->where('user_id', $user->id)
             ->firstOrFail();
 
-        Storage::disk('public')->delete($doc->archivo_path);
+        if ($doc->cloudinary_public_id) {
+            $resourceType = str_starts_with($doc->mime_type ?? '', 'image/') ? 'image' : 'raw';
+            $this->cloudinary->destroy($doc->cloudinary_public_id, $resourceType);
+        }
+
         $doc->delete();
 
         return response()->json(['success' => true, 'message' => 'Documento eliminado']);

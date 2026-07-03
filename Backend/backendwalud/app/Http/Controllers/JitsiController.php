@@ -105,9 +105,8 @@ class JitsiController extends Controller
             ? 'Dr. ' . $user->name . ' ' . $user->last_name
             : $user->name . ' ' . $user->last_name;
 
-        $avatarUrl = $user->profile_photo
-            ? url('/api/image/profile_photos/' . basename($user->profile_photo))
-            : null;
+        // ✅ profile_photo_path ya es la URL completa de Cloudinary
+        $avatarUrl = $user->profile_photo_path ?: null;
 
         // ── 6. Construir respuesta base (sin JWT → meet.jit.si gratuito)
         $appId = config('services.jitsi.app_id');
